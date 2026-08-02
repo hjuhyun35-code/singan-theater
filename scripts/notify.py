@@ -74,6 +74,13 @@ def summary(post: dict, repo: str) -> str:
 
 
 def main() -> int:
+    # 텔레그램 설정이 없어도 초안 만들기 자체는 성공으로 끝나야 합니다.
+    # (카드는 Actions 화면의 첨부파일에서 볼 수 있습니다)
+    if not os.environ.get("TELEGRAM_BOT_TOKEN") or not os.environ.get("TELEGRAM_CHAT_ID"):
+        print("텔레그램 설정이 없어 알림을 건너뜁니다.")
+        print("  → BotFather 에서 토큰을 받아 TELEGRAM_BOT_TOKEN 시크릿에 넣으세요.")
+        return 0
+
     chat_id = os.environ["TELEGRAM_CHAT_ID"]
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     slugs = [s for s in (os.environ.get("SLUGS") or "").split(",") if s]
