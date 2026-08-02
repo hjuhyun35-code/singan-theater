@@ -43,6 +43,8 @@ jobs:
         env:
           ALADIN_TTB_KEY: ${{ secrets.ALADIN_TTB_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # 없으면 국중 보강만 조용히 건너뜁니다
+          NL_API_KEY: ${{ secrets.NL_API_KEY }}
           DRAFT_COUNT: ${{ inputs.count }}
         run: python scripts/generate.py
 

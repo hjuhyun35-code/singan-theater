@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src import aladin, card, writer  # noqa: E402
+from src import aladin, card, nlk, writer  # noqa: E402
 from src.aladin import affiliate_link  # noqa: E402
 from src.settings import load_config  # noqa: E402
 
@@ -87,13 +87,19 @@ def within_window(book: dict, config: dict) -> bool:
     )
 
 
+def build_credit(book: dict, config: dict) -> str:
+    """실제로 쓴 자료의 출처만 표기합니다. 안 쓴 곳을 적으면 거짓말이 됩니다."""
+    if not config["제휴"].get("출처표기_사용"):
+        return ""
+    parts = [config["제휴"].get("출처표기_문구", "")]
+    if book.get("nlk_used"):
+        parts.append(config["제휴"].get("국중_출처표기_문구", ""))
+    return " / ".join(p for p in parts if p)
+
+
 def build_post(book: dict, copy: dict, slug: str, config: dict) -> dict:
     partner = config["제휴"]["알라딘_파트너ID"]
-    credit = (
-        config["제휴"].get("출처표기_문구", "")
-        if config["제휴"].get("출처표기_사용")
-        else ""
-    )
+    credit = build_credit(book, config)
     link = affiliate_link(book.get("link", ""), partner)
     hashtags = " ".join(copy["hashtags"])
 
@@ -154,6 +160,15 @@ def main() -> int:
         if detail:
             book = aladin.normalize(detail)
 
+        # 알라딘 기본 등급은 목차·전체 소개글을 안 줍니다. 국중에서 보강합니다.
+        before = len(book["description"])
+        book = nlk.enrich(book)
+        if book.get("nlk_used"):
+            print(
+                f"    국중 보강: 소개글 {before}→{len(book['description'])}자"
+                f"{', 목차 확보' if book.get('toc') else ''}"
+            )
+
         if len(book["description"]) < MIN_DESCRIPTION:
             print(f"  - 건너뜀 [{book['title']}]: 소개글이 너무 짧습니다")
             seen[book["isbn13"]] = {"title": book["title"], "skipped": "소개글 부족"}
@@ -173,12 +188,7 @@ def main() -> int:
         # 카드 파일 이름은 반드시 영문. 한글 파일명은 이미지 주소에서 깨집니다.
         card.CARD_DIR = out_dir
         paths = card.render_cards(
-            book,
-            copy,
-            config["발행"].get("표지_사용", True),
-            config["제휴"].get("출처표기_문구", "")
-            if config["제휴"].get("출처표기_사용")
-            else "",
+            book, copy, config["발행"].get("표지_사용", True), build_credit(book, config)
         )
 
         post = build_post(book, copy, slug, config)

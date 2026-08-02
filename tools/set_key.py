@@ -23,6 +23,8 @@ KEYS = [
      "https://www.aladin.co.kr/ttb/wblog_manage.aspx"),
     ("클로드", "ANTHROPIC_API_KEY", "Claude API 키 (sk-ant- 로 시작)",
      "https://console.anthropic.com/settings/keys"),
+    ("국중", "NL_API_KEY", "국립중앙도서관 서지정보 인증키 (목차·책소개)",
+     "https://www.nl.go.kr/NL/contents/N31101010000.do"),
     ("이미지", "IMGBB_API_KEY", "imgbb 이미지 호스팅 키",
      "https://api.imgbb.com/"),
     ("쓰레드앱", "THREADS_APP_ID", "쓰레드 Meta 앱 ID", "developers.facebook.com"),
