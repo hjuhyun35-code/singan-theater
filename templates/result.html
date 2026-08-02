@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>발행 결과 · 책 봇</title>
+<style>
+  body {
+    margin: 0; background: #14120F; color: #F2EEE7;
+    font-family: "Pretendard", "Malgun Gothic", sans-serif; line-height: 1.7;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 60px 28px; }
+  h1 { font-size: 24px; margin: 0 0 28px; }
+  .item {
+    background: #1E1B17; border: 1px solid #2E2A24; border-left: 4px solid #7FB88A;
+    border-radius: 10px; padding: 18px 22px; margin-bottom: 14px;
+  }
+  .item.fail { border-left-color: #E0715C; }
+  .item .name { font-weight: 700; }
+  .item .msg {
+    color: #E0715C; font-size: 14px; margin-top: 8px;
+    word-break: break-all; font-family: Consolas, monospace;
+  }
+  .ok-badge { color: #7FB88A; font-size: 14px; }
+  a.back {
+    display: inline-block; margin-top: 26px; background: #D4AF6A; color: #1A1611;
+    padding: 12px 22px; border-radius: 8px; font-weight: 700; text-decoration: none;
+  }
+  .hint { color: #9A9184; font-size: 14px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>발행 결과</h1>
+
+  {% for r in results %}
+  <div class="item {{ '' if r.ok else 'fail' }}">
+    <div class="name">{{ r.title }}</div>
+    {% if r.ok %}
+      <div class="ok-badge">올라갔습니다</div>
+    {% else %}
+      <div class="msg">{{ r.error }}</div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="item fail"><div class="name">발행된 항목이 없습니다.</div></div>
+  {% endfor %}
+
+  <a class="back" href="/">돌아가기</a>
+
+  <div class="hint">
+    실패한 항목은 '지난 기록'에 남습니다. 토큰 만료 오류라면
+    <code>tools\refresh_tokens.py</code> 를 실행한 뒤 다시 시도하세요.
+  </div>
+</div>
+</body>
+</html>

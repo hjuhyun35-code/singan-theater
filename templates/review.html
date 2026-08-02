@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>오늘의 초안 · 책 봇</title>
+<style>
+  :root {
+    --bg: #14120F; --panel: #1E1B17; --line: #2E2A24;
+    --text: #F2EEE7; --dim: #9A9184; --gold: #D4AF6A; --red: #E0715C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard", "Malgun Gothic", sans-serif;
+    line-height: 1.6;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(20,18,15,0.95); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    padding: 20px 28px; display: flex; align-items: center; gap: 20px;
+  }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  header .count { color: var(--dim); font-size: 14px; }
+  header .push { flex: 1; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px; }
+
+  .btn {
+    background: var(--gold); color: #1A1611; border: 0; border-radius: 8px;
+    padding: 12px 22px; font-size: 15px; font-weight: 700; cursor: pointer;
+    font-family: inherit;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.ghost {
+    background: transparent; color: var(--dim);
+    border: 1px solid var(--line); font-weight: 500;
+  }
+  .btn.ghost:hover { color: var(--text); border-color: var(--dim); }
+
+  .draft {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; margin-bottom: 24px; overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .draft.on { border-color: var(--gold); }
+
+  .draft-head {
+    display: flex; align-items: flex-start; gap: 16px;
+    padding: 20px 24px; border-bottom: 1px solid var(--line);
+  }
+  .draft-head label { display: flex; gap: 14px; cursor: pointer; flex: 1; }
+  .draft-head input[type=checkbox] { width: 22px; height: 22px; margin-top: 3px; accent-color: var(--gold); flex: none; }
+  .title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+  .byline { color: var(--dim); font-size: 14px; margin-top: 4px; }
+  .byline a { color: var(--dim); }
+
+  .draft-body { padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  @media (max-width: 860px) { .draft-body { grid-template-columns: 1fr; } }
+
+  .cards { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+  .cards img {
+    width: 172px; flex: none; border-radius: 8px; border: 1px solid var(--line);
+    cursor: zoom-in; display: block;
+  }
+
+  .field-label {
+    font-size: 12px; color: var(--dim); letter-spacing: 0.1em;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  textarea {
+    width: 100%; min-height: 190px; background: #16130F; color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 14px;
+    font-family: inherit; font-size: 15px; line-height: 1.7; resize: vertical;
+  }
+  textarea:focus { outline: none; border-color: var(--gold); }
+
+  .searchline {
+    width: 100%; background: #16130F; color: var(--gold);
+    border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;
+    font-family: inherit; font-size: 15px; font-weight: 600;
+  }
+  .searchline:focus { outline: none; border-color: var(--gold); }
+
+  details.alts { margin-top: 14px; }
+  details.alts summary { color: var(--dim); cursor: pointer; font-size: 13px; }
+  .alt-item {
+    font-size: 13px; color: var(--dim); padding: 8px 0;
+    border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: baseline;
+  }
+  .alt-item .n {
+    color: var(--gold); font-weight: 700; flex: none; min-width: 14px;
+  }
+  .alt-item .len { margin-left: auto; flex: none; font-size: 12px; }
+  .alt-item .len.over { color: var(--red); font-weight: 700; }
+  .tags { color: var(--gold); font-size: 14px; margin-top: 10px; word-break: keep-all; }
+  .counter { font-size: 13px; color: var(--dim); margin-top: 8px; }
+  .counter.over { color: var(--red); font-weight: 700; }
+  .row { display: flex; gap: 10px; margin-top: 14px; align-items: center; }
+
+  .bar {
+    position: sticky; bottom: 0; background: rgba(20,18,15,0.96);
+    backdrop-filter: blur(8px); border-top: 1px solid var(--line);
+    padding: 18px 28px; display: flex; align-items: center; gap: 16px;
+  }
+  .bar .note { color: var(--dim); font-size: 14px; }
+
+  .empty { text-align: center; padding: 90px 20px; color: var(--dim); }
+  .empty code {
+    display: inline-block; margin-top: 14px; background: var(--panel);
+    padding: 10px 16px; border-radius: 8px; color: var(--gold); font-size: 14px;
+  }
+
+  details.history { margin-top: 40px; }
+  details.history summary { color: var(--dim); cursor: pointer; font-size: 14px; }
+  .hist { font-size: 14px; color: var(--dim); padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .hist .ok { color: #7FB88A; } .hist .fail { color: var(--red); }
+
+  dialog { border: 0; background: transparent; padding: 0; }
+  dialog::backdrop { background: rgba(0,0,0,0.86); }
+  dialog img { max-width: 92vw; max-height: 92vh; border-radius: 10px; display: block; }
+</style>
+</head>
+<body>
+
+<form method="post" action="/publish" id="pubform">
+<header>
+  <h1>오늘의 초안</h1>
+  <span class="count">{{ drafts|length }}건 대기 · 올릴 곳:
+    {% if threads_on %}쓰레드{% endif %}{% if threads_on and instagram_on %} + {% endif %}{% if instagram_on %}인스타그램{% endif %}
+  </span>
+  <span class="push"></span>
+</header>
+
+<div class="wrap">
+  {% if not drafts %}
+    <div class="empty">
+      <div>대기 중인 초안이 없습니다.</div>
+      <div style="margin-top:8px">새 초안을 만들려면 아래를 실행하세요.</div>
+      <code>실행.bat</code>
+    </div>
+  {% endif %}
+
+  {% for d in drafts %}
+  <div class="draft" id="draft-{{ d.id }}">
+    <div class="draft-head">
+      <label>
+        <input type="checkbox" name="draft_ids" value="{{ d.id }}" checked
+               onchange="this.closest('.draft').classList.toggle('on', this.checked); tally()">
+        <span>
+          <div class="title">{{ d.title }}</div>
+          <div class="byline">
+            {{ d.author }} · {{ d.publisher }} · {{ d.pub_date }}
+            {% if d.link %} · <a href="{{ d.link }}" target="_blank">알라딘에서 보기</a>{% endif %}
+          </div>
+        </span>
+      </label>
+    </div>
+
+    <div class="draft-body">
+      <div>
+        <div class="field-label">인스타 카드 {{ d.cards|length }}장</div>
+        <div class="cards">
+          {% for i in range(d.cards|length) %}
+          <img src="/card/{{ d.id }}/{{ i }}" alt="카드 {{ i+1 }}" onclick="zoom(this.src)">
+          {% endfor %}
+        </div>
+      </div>
+
+      <div>
+        <div class="field-label">인스타 캡션 첫 줄 · 검색에 잡히는 줄입니다</div>
+        <input type="text" class="searchline" name="search_{{ d.id }}"
+               value="{{ d.search_line or '' }}" maxlength="60"
+               placeholder="예: 돈의 심리학 요약 — 투자가 자꾸 흔들린다면">
+
+        <div class="field-label" style="margin-top:18px">쓰레드 본문 (고쳐 쓸 수 있습니다)</div>
+        <textarea name="text_{{ d.id }}" data-id="{{ d.id }}"
+                  data-extra="{{ (d.hashtags or '')|length + (d.link or '')|length + 4 }}"
+                  oninput="countUp(this)">{{ d.threads_text }}</textarea>
+        <div class="tags">{{ d.hashtags }}</div>
+        <div class="counter" id="c-{{ d.id }}"></div>
+
+        {% if d.alts %}
+        <details class="alts">
+          <summary>대체텍스트 {{ d.alts|length }}개 (인스타 검색이 읽습니다)</summary>
+          {% for a in d.alts %}
+          <div class="alt-item">
+            <span class="n">{{ loop.index }}</span>{{ a }}
+            <span class="len {{ 'over' if a|length > 100 else '' }}">{{ a|length }}자</span>
+          </div>
+          {% endfor %}
+        </details>
+        {% endif %}
+        <div class="row">
+          <button type="button" class="btn ghost" onclick="skip({{ d.id }})">이 책은 건너뛰기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if history %}
+  <details class="history">
+    <summary>지난 기록 보기</summary>
+    {% for h in history %}
+    <div class="hist">
+      <span class="{{ 'ok' if h.status == 'published' else ('fail' if h.status == 'failed' else '') }}">
+        [{{ h.status }}]
+      </span>
+      {{ h.title }}
+      {% if h.note %}<br><span class="fail">{{ h.note }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </details>
+  {% endif %}
+</div>
+
+{% if drafts %}
+<div class="bar">
+  <button type="submit" class="btn" id="pubbtn">선택한 <span id="n">{{ drafts|length }}</span>건 발행</button>
+  <span class="note">누르는 즉시 실제 계정에 올라갑니다. 되돌릴 수 없습니다.</span>
+</div>
+{% endif %}
+</form>
+
+<dialog id="zoomer" onclick="this.close()"><img id="zoomimg" src=""></dialog>
+
+<script>
+function tally() {
+  const n = document.querySelectorAll('input[name=draft_ids]:checked').length;
+  document.getElementById('n').textContent = n;
+  document.getElementById('pubbtn').disabled = n === 0;
+}
+
+function countUp(el) {
+  const total = el.value.length + parseInt(el.dataset.extra || 0, 10);
+  const box = document.getElementById('c-' + el.dataset.id);
+  box.textContent = `본문 ${el.value.length}자 · 해시태그와 링크까지 ${total}/500자`;
+  box.classList.toggle('over', total > 500);
+}
+
+async function skip(id) {
+  await fetch('/skip/' + id, { method: 'POST' });
+  document.getElementById('draft-' + id).remove();
+  tally();
+}
+
+function zoom(src) {
+  document.getElementById('zoomimg').src = src;
+  document.getElementById('zoomer').showModal();
+}
+
+document.querySelectorAll('textarea').forEach(countUp);
+document.querySelectorAll('.draft').forEach(d => d.classList.add('on'));
+document.getElementById('pubform').addEventListener('submit', e => {
+  const n = document.querySelectorAll('input[name=draft_ids]:checked').length;
+  if (!confirm(n + '건을 지금 발행합니다. 계속할까요?')) e.preventDefault();
+  else document.getElementById('pubbtn').textContent = '올리는 중...';
+});
+tally();
+</script>
+</body>
+</html>
