@@ -17,6 +17,19 @@ LIST_URL = "https://www.aladin.co.kr/ttb/api/ItemList.aspx"
 LOOKUP_URL = "https://www.aladin.co.kr/ttb/api/ItemLookUp.aspx"
 VERSION = "20131101"
 TIMEOUT = 20
+RETRIES = 5
+
+# 알라딘이 기본 python-requests 요청을 막는 경우가 있어 브라우저처럼 보내고,
+# 어디서 쓰는지도 밝힙니다.
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/xml,text/xml,*/*",
+    "Accept-Language": "ko-KR,ko;q=0.9",
+    "Referer": "https://www.aladin.co.kr/",
+}
 
 _TAG = re.compile(r"<[^>]+>")
 _WS = re.compile(r"[ \t]+")
@@ -50,9 +63,15 @@ def _item_to_dict(item: ET.Element) -> dict:
 
 def _request(url: str, params: dict) -> list[dict]:
     params = {**params, "ttbkey": env("ALADIN_TTB_KEY", required=True), "Version": VERSION, "output": "xml"}
-    for attempt in range(3):
+    last = ""
+    for attempt in range(RETRIES):
         try:
-            resp = requests.get(url, params=params, timeout=TIMEOUT)
+            resp = requests.get(url, params=params, headers=HEADERS, timeout=TIMEOUT)
+            if resp.status_code == 403:
+                # 해외 서버에서 간헐적으로 막힙니다. 간격을 늘려가며 다시 시도합니다.
+                last = "403 (알라딘이 이 서버의 접근을 거부)"
+                time.sleep(3 * (attempt + 1))
+                continue
             resp.raise_for_status()
             body = resp.text
             if "잘못된" in body and "<item" not in body:
@@ -60,10 +79,11 @@ def _request(url: str, params: dict) -> list[dict]:
             root = ET.fromstring(body.encode("utf-8"))
             return [_item_to_dict(el) for el in root.iter() if _localname(el.tag) == "item"]
         except (requests.RequestException, ET.ParseError) as exc:
-            if attempt == 2:
-                raise RuntimeError(f"알라딘 API 호출 실패: {exc}") from exc
+            last = str(exc)
+            if attempt == RETRIES - 1:
+                break
             time.sleep(1.5 * (attempt + 1))
-    return []
+    raise RuntimeError(f"알라딘 API 호출 실패: {last}")
 
 
 def fetch_list(query_type: str, category_id: int, max_results: int = 10) -> list[dict]:
