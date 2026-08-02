@@ -4,14 +4,19 @@ import json
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "out"
 CARD_DIR = OUT_DIR / "cards"
 DB_PATH = OUT_DIR / "drafts.db"
 
-load_dotenv(ROOT / ".env")
+# .env 는 내 컴퓨터에서만 씁니다.
+# GitHub Actions 에서는 Secrets 가 환경변수로 들어오므로 dotenv 가 없어도 됩니다.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(ROOT / ".env")
+except ModuleNotFoundError:
+    pass
 
 
 def load_config() -> dict:
