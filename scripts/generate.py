@@ -125,6 +125,9 @@ def build_post(book: dict, copy: dict, slug: str, config: dict) -> dict:
         "hashtags": hashtags,
         "confidence": copy.get("confidence", ""),
         "copy_overlap": copy.get("copy_overlap", 0),
+        # 재료가 얼마나 두꺼웠는지. 사실만 남기고 판정은 하지 않습니다.
+        "source_len": len(book.get("description") or ""),
+        "toc_len": len(book.get("toc") or ""),
         # 카드에 들어간 문구를 그대로 남깁니다.
         # 나중에 디자인만 바꿔 다시 그릴 때 모델을 또 부르지 않아도 됩니다.
         "slides": copy["slides"],
@@ -203,8 +206,10 @@ def main() -> int:
         seen[book["isbn13"]] = {"title": book["title"], "slug": slug}
         made.append(slug)
 
-        note = " (자료 빈약 — 확인 필요)" if copy.get("confidence") == "low" else ""
-        print(f"    → {slug} 카드 {len(post['cards'])}장{note}\n")
+        print(
+            f"    → {slug} 카드 {len(post['cards'])}장 "
+            f"(원문 {post['source_len']}자)\n"
+        )
 
     save_seen(seen)
 

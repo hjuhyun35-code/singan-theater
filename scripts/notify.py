@@ -56,13 +56,13 @@ def summary(post: dict, repo: str) -> str:
         "",
         post["threads_text"][:600],
     ]
-    warn = []
-    if post.get("confidence") == "low":
-        warn.append("⚠️ 자료가 빈약해 내용이 얕을 수 있습니다")
+    # 판정("얕다")이 아니라 사실만 적습니다. 판단은 보는 사람 몫입니다.
+    notes = [f"원문 소개글 {post.get('source_len', 0)}자"]
+    if post.get("toc_len"):
+        notes.append(f"목차 {post['toc_len']}자")
     if post.get("copy_overlap", 0) >= 22:
-        warn.append(f"⚠️ 소개글과 {post['copy_overlap']}자 겹칩니다")
-    if warn:
-        lines += ["", *warn]
+        notes.append(f"원문과 {post['copy_overlap']}자 겹침 — 손보는 게 좋습니다")
+    lines += ["", " · ".join(notes)]
     lines += [
         "",
         "─" * 20,
