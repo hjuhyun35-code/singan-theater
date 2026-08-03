@@ -44,6 +44,22 @@ def _drop_empty(params: dict) -> dict:
     return {k: v for k, v in params.items() if v not in (None, "")}
 
 
+def _post_allowing_alt_failure(url: str, params: dict) -> dict:
+    """대체텍스트 때문에 거부되면 그것만 빼고 다시 시도합니다.
+
+    대체텍스트는 있으면 좋은 것이지 게시물 전체를 날릴 이유는 아닙니다.
+    """
+    try:
+        return _post(url, _drop_empty(params))
+    except PublishError as exc:
+        if "alt_text" not in params or not params.get("alt_text"):
+            raise
+        if "alt" not in str(exc).lower():
+            raise
+        print(f"  대체텍스트가 거부되어 없이 재시도합니다: {exc}")
+        return _post(url, _drop_empty({**params, "alt_text": ""}))
+
+
 def _fit_alts(alt_texts: list[str] | None, count: int) -> list[str]:
     """대체텍스트를 이미지 수에 맞추고, 100자 제한을 지킵니다."""
     alts = list(alt_texts or [])
@@ -162,29 +178,25 @@ def post_to_instagram(
     alts = _fit_alts(alt_texts, len(image_urls))
 
     if len(image_urls) == 1:
-        container = _post(
+        container = _post_allowing_alt_failure(
             f"{base}/media",
-            _drop_empty(
-                {
-                    "image_url": image_urls[0],
-                    "caption": caption,
-                    "alt_text": alts[0],
-                    "access_token": token,
-                }
-            ),
+            {
+                "image_url": image_urls[0],
+                "caption": caption,
+                "alt_text": alts[0],
+                "access_token": token,
+            },
         )["id"]
     else:
         children = [
-            _post(
+            _post_allowing_alt_failure(
                 f"{base}/media",
-                _drop_empty(
-                    {
-                        "image_url": url,
-                        "is_carousel_item": "true",
-                        "alt_text": alt,
-                        "access_token": token,
-                    }
-                ),
+                {
+                    "image_url": url,
+                    "is_carousel_item": "true",
+                    "alt_text": alt,
+                    "access_token": token,
+                },
             )["id"]
             # 인스타 캐러셀은 최대 10장
             for url, alt in list(zip(image_urls, alts))[:10]
