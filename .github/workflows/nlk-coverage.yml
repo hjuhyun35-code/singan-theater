@@ -1,0 +1,32 @@
+name: 국중 수록률 확인
+
+# 국립중앙도서관에 목차·책소개가 실제로 얼마나 들어 있는지 잽니다.
+# 인증키를 넣은 직후 한 번 돌려보세요. 아무것도 발행하지 않습니다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sample:
+        description: "표본 권수 (기본 20)"
+        required: false
+        default: "20"
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 패키지 설치
+        run: pip install requests
+
+      - name: 수록률 측정
+        env:
+          ALADIN_TTB_KEY: ${{ secrets.ALADIN_TTB_KEY }}
+          NL_API_KEY: ${{ secrets.NL_API_KEY }}
+        run: python tools/nlk_coverage.py ${{ inputs.sample }}
