@@ -1,0 +1,34 @@
+name: 토큰 갱신
+
+# 인스타·쓰레드 토큰은 60일이면 만료됩니다.
+# 매주 한 번 연장해 항상 60일이 남아 있게 유지합니다.
+# 실패하면 텔레그램으로 알려줍니다. 아무것도 발행하지 않습니다.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 매주 월요일 오전 9시(한국)
+    - cron: "0 0 * * 1"
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: 토큰 연장
+        env:
+          # 시크릿을 고쳐 써야 해서 기본 GITHUB_TOKEN 으로는 안 됩니다.
+          # 저장소 전용 PAT 를 GH_PAT 에 넣어두세요. (Secrets 쓰기 권한 필요)
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/refresh_token.py
