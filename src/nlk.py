@@ -3,8 +3,11 @@
 알라딘 기본 등급은 목차와 전체 소개글을 주지 않습니다.
 여기서 그 두 가지를 받아와 재료를 두껍게 만듭니다.
 
-주의: 목차·책소개는 출판사가 ISBN 등록 때 제출한 자료라 없는 책도 많습니다.
-      수록률은 tools/nlk_coverage.py 로 실제로 재봐야 합니다.
+★ 2026-08-03 실측 결과: 신간 20권 표본에서 목차·책소개 수록률 0% 였습니다.
+  응답에 칸(BOOK_TB_CNT_URL 등)은 있지만 값이 전부 빈 문자열입니다.
+  그래서 config.json 의 '국중_사용' 을 false 로 두었습니다.
+  나중에 국중이 자료를 채우면 true 로 바꾸기만 하면 됩니다.
+  다시 재보려면: 국중 수록률 확인 워크플로
 """
 
 import re
@@ -37,7 +40,19 @@ _TAG = re.compile(r"<[^>]+>")
 
 
 def enabled() -> bool:
-    return bool(env("NL_API_KEY"))
+    """키가 있고, 설정에서 켜져 있을 때만 씁니다.
+
+    실측 수록률이 0% 라 기본은 꺼져 있습니다. 괜히 책마다 한 번씩
+    더 호출해봐야 얻는 게 없습니다.
+    """
+    if not env("NL_API_KEY"):
+        return False
+    try:
+        from .settings import load_config
+
+        return bool(load_config().get("제휴", {}).get("국중_사용", False))
+    except Exception:
+        return False
 
 
 def _clean(text: str) -> str:
