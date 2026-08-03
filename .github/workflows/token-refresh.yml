@@ -1,8 +1,10 @@
-name: 토큰 갱신
+name: 토큰 점검
 
-# 인스타·쓰레드 토큰은 60일이면 만료됩니다.
-# 매주 한 번 연장해 항상 60일이 남아 있게 유지합니다.
-# 실패하면 텔레그램으로 알려줍니다. 아무것도 발행하지 않습니다.
+# 인스타·쓰레드 토큰은 60일이면 만료되고, 만료되면 발행이 조용히 멈춥니다.
+# 매주 확인해서 죽으면 텔레그램으로 알려줍니다. 아무것도 발행하지 않습니다.
+#
+# GH_PAT(Secrets 쓰기 권한)를 넣어두면 확인에 그치지 않고 60일 연장까지 자동으로 합니다.
+# 없어도 '조용히 멈추는 것'은 막아줍니다.
 
 on:
   workflow_dispatch:
@@ -22,10 +24,9 @@ jobs:
 
       - run: pip install requests
 
-      - name: 토큰 연장
+      - name: 토큰 점검
         env:
-          # 시크릿을 고쳐 써야 해서 기본 GITHUB_TOKEN 으로는 안 됩니다.
-          # 저장소 전용 PAT 를 GH_PAT 에 넣어두세요. (Secrets 쓰기 권한 필요)
+          # 비어 있으면 '확인만' 모드로 돕니다. 넣으면 자동 연장까지 합니다.
           GH_TOKEN: ${{ secrets.GH_PAT }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}

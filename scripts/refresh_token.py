@@ -1,7 +1,14 @@
-"""인스타·쓰레드 토큰의 유효기간을 연장하고 GitHub Secrets 에 다시 넣습니다.
+"""토큰이 살아 있는지 매주 확인합니다.
 
 토큰은 60일이면 만료되고, 만료되면 발행이 조용히 멈춥니다.
-매주 한 번 돌려서 항상 60일이 남아 있게 유지합니다.
+그 '조용히'가 문제라서, 죽는 즉시 텔레그램으로 알려줍니다.
+
+두 가지 모드로 동작합니다.
+  · GH_TOKEN 이 없을 때(기본)  — 확인만 하고, 문제가 있으면 알림
+  · GH_TOKEN 이 있을 때        — 60일 연장까지 자동으로 하고 시크릿을 갱신
+
+기본 모드로도 목적(조용한 중단 방지)은 달성됩니다.
+완전 자동으로 하고 싶으면 Secrets 쓰기 권한이 있는 PAT 를 GH_PAT 에 넣으세요.
 
 토큰 값은 화면에 절대 찍지 않습니다. gh 로 넘길 때도 표준입력을 씁니다.
 """
@@ -24,12 +31,14 @@ PLATFORMS = [
         "host": "https://graph.instagram.com",
         "grant": "ig_refresh_token",
         "secret": "INSTAGRAM_ACCESS_TOKEN",
+        "me": "https://graph.instagram.com/v23.0/me",
     },
     {
         "label": "쓰레드",
         "host": "https://graph.threads.net",
         "grant": "th_refresh_token",
         "secret": "THREADS_ACCESS_TOKEN",
+        "me": "https://graph.threads.net/v1.0/me",
     },
 ]
 
@@ -77,11 +86,23 @@ def notify(text: str) -> None:
         pass
 
 
+def alive(me_url: str, token: str) -> tuple[bool, str]:
+    """토큰이 아직 쓸 수 있는지만 확인합니다. 아무것도 바꾸지 않습니다."""
+    try:
+        resp = requests.get(
+            me_url, params={"fields": "id,username", "access_token": token}, timeout=TIMEOUT
+        )
+        data = resp.json()
+    except (requests.RequestException, ValueError) as exc:
+        return False, str(exc)[:150]
+    if "error" in data:
+        return False, data["error"].get("message", "")[:150]
+    return True, data.get("username", "")
+
+
 def main() -> int:
-    if not os.environ.get("GH_TOKEN"):
-        print("GH_TOKEN 이 없습니다. 시크릿을 저장할 권한이 없어 중단합니다.")
-        print("  → 저장소 Secrets 에 GH_PAT 를 넣고 워크플로에 연결하세요.")
-        return 1
+    auto = bool(os.environ.get("GH_TOKEN"))
+    print("모드:", "자동 연장" if auto else "확인만 (연장하려면 GH_PAT 필요)")
 
     problems: list[str] = []
     touched = 0
@@ -91,6 +112,18 @@ def main() -> int:
         if not token:
             print(f"[{p['label']}] 토큰이 없어 건너뜁니다.")
             continue
+
+        if not auto:
+            ok, info = alive(p["me"], token)
+            if ok:
+                touched += 1
+                print(f"[{p['label']}] 정상 — @{info}")
+            else:
+                msg = f"[{p['label']}] 토큰이 동작하지 않습니다: {info}"
+                print(msg)
+                problems.append(msg)
+            continue
+
         try:
             new_token, days = refresh(p["host"], p["grant"], token)
         except (requests.RequestException, RuntimeError, ValueError) as exc:
@@ -122,7 +155,7 @@ def main() -> int:
         return 1
 
     if touched == 0:
-        print("갱신할 토큰이 없었습니다.")
+        print("확인할 토큰이 없었습니다.")
     return 0
 
 
