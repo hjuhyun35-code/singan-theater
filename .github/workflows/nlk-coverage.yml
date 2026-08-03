@@ -25,7 +25,13 @@ jobs:
       - name: 패키지 설치
         run: pip install requests
 
+      - name: 응답 진단
+        env:
+          NL_API_KEY: ${{ secrets.NL_API_KEY }}
+        run: python tools/nlk_debug.py
+
       - name: 수록률 측정
+        if: always()
         env:
           ALADIN_TTB_KEY: ${{ secrets.ALADIN_TTB_KEY }}
           NL_API_KEY: ${{ secrets.NL_API_KEY }}
