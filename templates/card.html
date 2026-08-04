@@ -63,7 +63,45 @@
     inset: 44px;
     border: 1px solid var(--frame);
     pointer-events: none;
+    z-index: 2;
   }
+
+  /* ---- 둘째 장부터 표지를 보여주는 두 가지 방법 ---- */
+
+  /* ① 배경에 흐리게. 글자가 묻히지 않게 아주 옅게 깔고 장막을 덮습니다. */
+  .bg-cover {
+    position: absolute;
+    inset: -8%;
+    background-size: cover;
+    background-position: center;
+    filter: blur(56px) saturate(1.25);
+    opacity: 0.30;
+  }
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(120% 90% at 15% 0%,
+                 color-mix(in srgb, var(--bg-a) 72%, transparent) 0%,
+                 color-mix(in srgb, var(--bg-b) 88%, transparent) 62%);
+  }
+  /* 배경보다 글이 위에 오도록 */
+  .card > .content,
+  .card > .meta,
+  .card > .credit,
+  .card > .cover-wrap,
+  .card > .titleblock,
+  .card > .icon-cover { position: relative; z-index: 1; }
+
+  /* ② 위쪽에 작은 표지 아이콘 */
+  .icon-cover {
+    flex: none;
+    width: 92px;
+    border-radius: 4px;
+    box-shadow: 0 8px 20px var(--shadow);
+    margin-bottom: 30px;
+    display: block;
+  }
+  .outro .icon-cover { margin-left: auto; margin-right: auto; }
 
   /* 본문 블록을 세로 가운데로 모아 빈 공간을 없앱니다 */
   .content {
@@ -179,40 +217,35 @@
     letter-spacing: 0.01em;
   }
 
-  /* ---- 표지가 들어가는 첫 장 ---- */
+  /* ---- 표지가 들어가는 첫 장 ----
+     표지에 제목이 이미 크게 박혀 있으므로 제목·저자를 글자로 또 쓰지 않습니다.
+     그 자리를 표지와 훅 문구에 내줍니다. ---- */
   .cover-wrap {
     display: flex;
-    gap: 52px;
-    align-items: center;
-    margin-bottom: 60px;
-    flex: none;
+    justify-content: center;
+    margin-bottom: 44px;
+    /* 글이 길면 표지가 조금 줄어들어 아래가 안 눌리게 합니다 */
+    flex: 0 1 auto;
+    min-height: 0;
   }
 
   .cover {
-    width: 286px;
-    flex: 0 0 286px;
-    border-radius: 5px;
-    box-shadow: 0 26px 58px var(--shadow);
+    width: auto;
+    max-width: 420px;
+    max-height: 500px;
+    border-radius: 6px;
+    box-shadow: 0 30px 64px var(--shadow);
     display: block;
+    object-fit: contain;
   }
 
-  .cover-side { min-width: 0; }
-
-  .cover-side .title {
-    font-size: 44px;
-    font-weight: 800;
-    line-height: 1.32;
-    letter-spacing: -0.02em;
-    word-break: keep-all;
-    margin-bottom: 20px;
-  }
-
-  .cover-side .byline {
-    font-size: 27px;
-    color: var(--ink-dim);
-    line-height: 1.62;
-    word-break: keep-all;
-  }
+  /* 첫 장은 글자도 키웁니다 (표지와 함께 들어가므로 무한정 키울 순 없습니다) */
+  .cover-slide .headline { font-size: 70px; }
+  .cover-slide .headline.m { font-size: 60px; }
+  .cover-slide .headline.s { font-size: 50px; }
+  .cover-slide .rule { margin: 28px 0; }
+  .cover-slide .body { font-size: 37px; }
+  .cover-slide .meta { margin-top: 40px; }
 
   /* 표지가 없을 때 첫 장이 허전하지 않도록 */
   .titleblock {
@@ -236,14 +269,19 @@
 <body class="t-{{ theme or '밤' }}"{% if accent %} style="--accent: {{ accent }}"{% endif %}>
 <div class="card k-{{ kind }} {{ 'cover-slide' if show_cover else '' }} {{ 'outro' if is_outro else '' }}">
 
+{# 첫 장이 아닌 카드에서 표지를 어떻게 쓸지 #}
+{% if not show_cover and cover_url and back_cover == '배경' %}
+  <div class="bg-cover" style="background-image:url('{{ cover_url }}')"></div>
+  <div class="scrim"></div>
+{% elif not show_cover and cover_url and back_cover == '아이콘' %}
+  <img class="icon-cover" src="{{ cover_url }}" alt="">
+{% endif %}
+
   {% if show_cover %}
     {% if cover_url %}
+    {# 제목·저자는 표지에 이미 있으므로 글자로 반복하지 않습니다 #}
     <div class="cover-wrap">
       <img class="cover" src="{{ cover_url }}" alt="">
-      <div class="cover-side">
-        <div class="title">{{ title }}</div>
-        <div class="byline">{{ author }}<br>{{ publisher }}</div>
-      </div>
     </div>
     {% else %}
     <div class="titleblock">

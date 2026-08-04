@@ -115,6 +115,7 @@ def render_cards(
     credit: str = "",
     theme: str = "밤",
     accent_from_cover: bool = True,
+    back_cover: str = "없음",
 ) -> list[str]:
     """카드 이미지를 만들고 저장된 파일 경로 목록을 돌려줍니다.
 
@@ -143,7 +144,11 @@ def render_cards(
         try:
             for slide in slides:
                 html = template.render(
-                    cover_url=cover, theme=theme, accent=accent, **slide
+                    cover_url=cover,
+                    theme=theme,
+                    accent=accent,
+                    back_cover=back_cover,
+                    **slide,
                 )
                 page.set_content(html, wait_until="load")
                 page.wait_for_timeout(120)  # 폰트가 자리를 잡을 시간
