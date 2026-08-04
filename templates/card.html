@@ -89,8 +89,7 @@
   .card > .meta,
   .card > .credit,
   .card > .cover-wrap,
-  .card > .titleblock,
-  .card > .icon-cover { position: relative; z-index: 1; }
+  .card > .titleblock { position: relative; z-index: 1; }
 
   /* ② 위쪽에 작은 표지 아이콘 */
   .icon-cover {
@@ -269,7 +268,7 @@
      거친 스텐실 글꼴은 없으므로, 글자에 잡티를 덮어 비슷한 느낌을 냅니다. */
 
   .s-포스터 .card {
-    padding: 78px 74px 72px;
+    padding: 62px 64px 58px;
     background:
       radial-gradient(120% 80% at 50% 8%,
         color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 55%),
@@ -292,9 +291,9 @@
     box-shadow: inset 0 0 200px 70px rgba(0, 0, 0, 0.62);
   }
 
-  .s-포스터 .cover-wrap { margin-bottom: 30px; }
+  .s-포스터 .cover-wrap { margin-bottom: 18px; }
   .s-포스터 .cover {
-    max-width: 430px;
+    max-width: 450px;
     max-height: 520px;
     border-radius: 3px;
     box-shadow:
@@ -307,20 +306,20 @@
   /* 네모 테두리를 두른 라벨 */
   .s-포스터 .kicker {
     align-self: flex-start;
-    font-size: 26px;
+    font-size: 25px;
     letter-spacing: 0.3em;
-    padding: 9px 20px 9px 26px;
+    padding: 7px 16px 7px 22px;
     border: 2px solid var(--accent);
-    margin-bottom: 22px;
+    margin-bottom: 14px;
   }
   .s-포스터 .outro .kicker { align-self: center; }
 
   /* 큰 글씨 + 잡티 질감 */
   .s-포스터 .headline {
-    font-size: 108px;
+    font-size: 144px;
     font-weight: 800;
-    line-height: 1.02;
-    letter-spacing: -0.045em;
+    line-height: 1.04;
+    letter-spacing: -0.055em;
     /* 잡티를 옅게 깔아 '닳은 글씨' 느낌만 냅니다. 진하면 지저분해집니다. */
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -0.9 0.42'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23g)'/%3E%3C/svg%3E");
     background-color: var(--ink);
@@ -329,11 +328,11 @@
     -webkit-text-fill-color: transparent;
     text-shadow: none;
   }
-  .s-포스터 .headline.m { font-size: 92px; }
-  .s-포스터 .headline.s { font-size: 74px; }
-  .s-포스터 .cover-slide .headline { font-size: 96px; }
-  .s-포스터 .cover-slide .headline.m { font-size: 82px; }
-  .s-포스터 .cover-slide .headline.s { font-size: 66px; }
+  .s-포스터 .headline.m { font-size: 130px; }
+  .s-포스터 .headline.s { font-size: 108px; }
+  .s-포스터 .cover-slide .headline { font-size: 138px; }
+  .s-포스터 .cover-slide .headline.m { font-size: 118px; }
+  .s-포스터 .cover-slide .headline.s { font-size: 98px; }
   /* 강조한 낱말 */
   .s-포스터 .headline em {
     font-style: normal;
@@ -345,17 +344,18 @@
 
   /* 첫 장은 표지 아래로 글을 내려붙입니다. 가운데 정렬하면 사이가 뜹니다. */
   .s-포스터 .cover-slide .content { justify-content: flex-end; }
+  .s-포스터 .icon-cover { margin-bottom: 18px; }
 
-  .s-포스터 .rule { height: 3px; width: 120px; margin: 26px 0 20px; }
-  .s-포스터 .body { font-size: 32px; line-height: 1.62; }
-  .s-포스터 .cover-slide .body { font-size: 31px; }
+  .s-포스터 .rule { height: 3px; width: 100px; margin: 20px 0 14px; }
+  .s-포스터 .body { font-size: 30px; line-height: 1.52; }
+  .s-포스터 .cover-slide .body { font-size: 29px; }
   .s-포스터 .body p + p { margin-top: 0.3em; }
   .s-포스터 .meta {
-    margin-top: 26px;
-    padding-top: 22px;
+    margin-top: 20px;
+    padding-top: 18px;
     border-top: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
     letter-spacing: 0.12em;
-    font-size: 25px;
+    font-size: 23px;
   }
   .s-포스터 .k-상황 .content,
   .s-포스터 .k-이야기 .content { border-left: none; padding-left: 0; }
@@ -370,8 +370,6 @@
 {% if not show_cover and cover_url and back_cover == '배경' %}
   <div class="bg-cover" style="background-image:url('{{ cover_url }}')"></div>
   <div class="scrim"></div>
-{% elif not show_cover and cover_url and back_cover == '아이콘' %}
-  <img class="icon-cover" src="{{ cover_url }}" alt="">
 {% endif %}
 
   {% if show_cover %}
@@ -389,6 +387,10 @@
   {% endif %}
 
   <div class="content">
+    {% if not show_cover and cover_url and back_cover == '아이콘' %}
+      <img class="icon-cover" src="{{ cover_url }}" alt="">
+    {% endif %}
+
     {% if kicker %}
       {# 이어지는 장면이면 ⋯ 를 앞에 붙여 같은 이야기임을 보입니다 #}
       <div class="kicker">{{ '⋯ ' if continues else '' }}{{ kicker }}</div>
