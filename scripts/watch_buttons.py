@@ -173,13 +173,37 @@ def handle(update: dict, token: str, repo: str) -> bool:
     return True
 
 
+def bot_username(token: str) -> str:
+    try:
+        return call("getMe", {}, token).get("result", {}).get("username", "")
+    except (requests.RequestException, RuntimeError):
+        return ""
+
+
 def main() -> int:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    expected = (os.environ.get("TELEGRAM_BOT_USERNAME") or "").lstrip("@").strip()
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     minutes = int(os.environ.get("WATCH_MINUTES") or 30)
     if not token:
         print("TELEGRAM_BOT_TOKEN 이 없습니다.")
         return 0
+
+    # ★남의 봇을 엿보지 않기 위한 안전장치.
+    # 버튼 눌림은 한 번 가져가면 텔레그램에서 지워집니다. 다른 프로젝트와 봇을
+    # 같이 쓰면 서로의 승인을 먹어치웁니다. 실제로 그런 일이 있었습니다.
+    who = bot_username(token)
+    if not expected:
+        print(f"이 토큰의 봇: @{who or '?'}")
+        print("TELEGRAM_BOT_USERNAME 이 정해져 있지 않아 감시하지 않습니다.")
+        print("  → 신간 극장 전용 봇을 만들고, 그 사용자명을 시크릿에 넣으세요.")
+        print("  → 다른 프로젝트와 봇을 같이 쓰면 서로의 버튼 눌림을 가져가 버립니다.")
+        return 0
+    if who != expected:
+        print(f"[막힘] 토큰의 봇이 @{who} 인데, 기대한 봇은 @{expected} 입니다.")
+        print("  → 남의 봇이라 건드리지 않고 멈춥니다. 토큰을 확인하세요.")
+        return 1
+    print(f"봇 확인: @{who}")
 
     deadline = time.time() + minutes * 60
     offset = None
