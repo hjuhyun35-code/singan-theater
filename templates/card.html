@@ -222,9 +222,9 @@
 
   <div class="content">
     {% if kicker %}
-      <div class="kicker">{{ kicker }}</div>
-    {% elif kind == '이야기' %}
-      {# 앞장에서 이어지는 장면이라는 표시 #}
+      {# 이어지는 장면이면 ⋯ 를 앞에 붙여 같은 이야기임을 보입니다 #}
+      <div class="kicker">{{ '⋯ ' if continues else '' }}{{ kicker }}</div>
+    {% elif continues %}
       <div class="cont">⋯</div>
     {% endif %}
 

@@ -179,6 +179,13 @@ def main() -> int:
             seen[book["isbn13"]] = {"title": book["title"], "skipped": "소개글 부족"}
             continue
 
+        # 출간 이력만 적힌 소개글이면 모델이 빈 곳을 상상으로 채웁니다. 미리 거릅니다.
+        ok, why = writer.has_material(book, config)
+        if not ok:
+            print(f"  - 건너뜀 [{book['title']}]: 책 내용이 없는 소개글 ({why})")
+            seen[book["isbn13"]] = {"title": book["title"], "skipped": f"재료 없음: {why}"}
+            continue
+
         print(f"  · 작성 중: {book['title']}")
         try:
             copy = writer.write_copy(book, config)

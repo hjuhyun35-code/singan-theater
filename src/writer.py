@@ -39,8 +39,10 @@ SLIDE_TYPES = {
         "이 카드가 한 장뿐이라면 그 안에서 결말까지 내라. 시작만 하고 끝내지 마라. "
         "★주인공을 특정하지 마라. '한 사람은', '누군가는', '당신이라면' 으로 써라. "
         "'나는' 으로 쓰면 계정 주인이 실제로 겪은 일처럼 읽히므로 금지. "
-        "★책에 실린 일화로 쓰면 절대 안 된다. 네가 만든 예시임이 분명해야 한다. "
-        "kicker 는 '이런 이야기' 또는 '가령'."
+        "★책에 실린 일화나 줄거리로 쓰면 절대 안 된다. 네가 만든 가정임이 분명해야 한다. "
+        "★인물의 선택과 결말을 서술하지 마라. 그건 줄거리이고, 너는 모른다. "
+        "★kicker 는 반드시 '가령' 으로 하라. 이어지는 장면에서도 마찬가지다. "
+        "읽는 사람이 '이건 지어낸 예시구나' 하고 알아야 한다."
     ),
     "핵심": (
         "이 책이 실제로 주장하는 바를 한 문장으로 압축하라. "
@@ -181,6 +183,13 @@ SYSTEM = """너는 책 소개 SNS 계정의 카피라이터다.
    '상황' 카드에서 일상 장면을 묘사할 때도, 그것이 네가 만든 예시임이 분명해야 하고
    책에서 가져온 것처럼 보이게 써서는 안 된다.
 
+7. ★소설을 다룰 때 특히 조심하라. 줄거리를 쓰지 마라.
+   - 등장인물이 무엇을 했는지, 어떤 선택을 했는지, 어떻게 됐는지 쓰지 마라.
+   - '결말은', '모두 ~하게 된다', '~는 이사를 결정한다' 같은 서술 금지.
+   - 네가 그 소설을 읽지 않았다는 사실을 잊지 마라. 자료에 줄거리가 없으면
+     너는 그 줄거리를 모른다. 아는 척하면 거짓말이 된다.
+   - 쓸 수 있는 것은 '이런 분위기의 이야기다', '이런 상황이 궁금하다면' 까지다.
+
 자료가 소개글 두세 줄뿐이라 내용을 알 수 없으면 confidence 를 low 로 두고,
 아는 만큼만 담백하게 써라. 모르면 모르는 대로 두는 편이 지어내는 것보다 낫다."""
 
@@ -213,7 +222,8 @@ def _beat_guide(slide_plan: list[str]) -> str:
         for i, (pos, beat) in enumerate(zip(positions, beats[: len(positions)]))
     ]
     lines.append(
-        "두 번째 장면부터는 kicker '만' 빈 문자열로 두어라. 같은 이야기가 이어진다는 표시다. "
+        "★모든 이야기 카드의 kicker 를 '가령' 으로 채워라. 이어지는 장면에서도 비우지 마라. "
+        "지어낸 예시라는 표시가 사라지면 읽는 사람이 줄거리로 오해한다. "
         "★headline 은 모든 장에서 반드시 채워라. 비우면 카드가 망가진다."
     )
     return "\n".join(lines)
@@ -328,6 +338,71 @@ def apply_plan(plan: list[str], slides: list[dict], book: dict) -> list[dict]:
         {**slide, "type": kind, "alt": _alt_text(slide, book)}
         for kind, slide in zip(plan, slides)
     ]
+
+
+MATERIAL_TOOL = {
+    "name": "judge_material",
+    "description": "이 소개글에 책 '안'에 대한 내용이 있는지 판단한다.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "has_material": {
+                "type": "boolean",
+                "description": (
+                    "이 소개글만 보고, 아무것도 지어내지 않고 '이 책이 무슨 내용인지' "
+                    "서너 문장을 쓸 수 있으면 true. 한 문장도 겨우 쓰겠으면 false."
+                ),
+            },
+            "reason": {"type": "string", "description": "한국어로 30자 이내."},
+        },
+        "required": ["has_material", "reason"],
+    },
+}
+
+
+def has_material(book: dict, config: dict) -> tuple[bool, str]:
+    """소개글에 쓸 재료가 있는지 봅니다.
+
+    출간 이력만 적힌 소개글로 글을 쓰면 모델이 빈 곳을 상상으로 채웁니다.
+    실제로 그런 일이 있었습니다(『살렘스 롯』 — 소개글에 줄거리가 한 줄도 없는데
+    카드에는 인물의 선택과 결말이 들어갔습니다). 그래서 미리 거릅니다.
+    """
+    text = (book.get("description") or "").strip()
+    if not text:
+        return False, "소개글 없음"
+    if book.get("toc"):
+        return True, "목차 있음"
+
+    try:
+        client = Anthropic(api_key=env("ANTHROPIC_API_KEY", required=True))
+        msg = client.messages.create(
+            model=config["모델"]["이름"],
+            max_tokens=200,
+            system=(
+                "너는 이 소개글로 책 소개 카드 다섯 장을 지어내지 않고 쓸 수 있는지 판단한다.\n\n"
+                "재료가 '없는' 것으로 봐야 하는 경우:\n"
+                "- 출간 소식, 새 판형, 재출간, 수상, 판매부수, 저자의 다른 작품, 추천사뿐\n"
+                "- 장르와 배경만 있고 무슨 일이 벌어지는지는 없는 경우\n"
+                "  (예: '20세기 미국 교외를 무대로 한 공포소설' — 이건 재료가 아니다.\n"
+                "   이걸로 카드를 쓰면 결국 줄거리를 상상해서 채우게 된다)\n"
+                "- 추상적인 찬사뿐 (예: '인생을 바꾸는 통찰')\n\n"
+                "재료가 '있는' 것으로 봐야 하는 경우:\n"
+                "- 무슨 일이 벌어지는지, 누가 무엇을 하는지가 조금이라도 적혀 있다\n"
+                "- 저자가 무엇을 주장하는지, 어떤 문제를 다루는지가 적혀 있다\n\n"
+                "애매하면 false 로 하라. 지어내는 것보다 건너뛰는 게 낫다."
+            ),
+            tools=[MATERIAL_TOOL],
+            tool_choice={"type": "tool", "name": "judge_material"},
+            messages=[{"role": "user", "content": f"[{book['title']}]\n\n{text}"}],
+        )
+        got = next((b.input for b in msg.content if b.type == "tool_use"), None)
+    except Exception as exc:
+        print(f"    (재료 판단 실패, 그냥 진행합니다: {exc})")
+        return True, "판단 실패"
+
+    if not got:
+        return True, "판단 실패"
+    return bool(got.get("has_material")), (got.get("reason") or "").strip()
 
 
 def adapt_plan(plan: list[str], book: dict) -> list[str]:

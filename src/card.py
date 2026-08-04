@@ -67,6 +67,7 @@ def build_slides(book: dict, copy: dict, credit: str = "") -> list[dict]:
     rendered = []
     for i, slide in enumerate(slides, start=1):
         kind = slide.get("type", "")
+        prev_kind = slides[i - 2].get("type", "") if i > 1 else ""
         rendered.append(
             {
                 "kind": kind,
@@ -82,6 +83,8 @@ def build_slides(book: dict, copy: dict, credit: str = "") -> list[dict]:
                 ],
                 "index": i,
                 "total": total,
+                # 앞장에서 이어지는 장면인지. 같은 종류가 연달아 나오면 이어짐입니다.
+                "continues": kind != "" and kind == prev_kind,
                 "show_cover": i == 1,
                 # 마무리 스타일은 맨 끝 장에만. (중간에 놓인 '정리'까지 가운데정렬되면 어색합니다)
                 "is_outro": i == total and total > 1,
