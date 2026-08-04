@@ -77,6 +77,19 @@ def summary(post: dict, repo: str) -> str:
     if post.get("copy_overlap", 0) >= 22:
         notes.append(f"원문과 {post['copy_overlap']}자 겹침 — 손보는 게 좋습니다")
     lines += ["", " · ".join(notes)]
+    s = post.get("review_summary") or {}
+    if s:
+        lines += [
+            "",
+            f"👥 독자 {s['인원']}명 — 멈춤 {s['멈춤']} · 저장 {s['저장']} · 팔로우 {s['팔로우']}",
+        ]
+        for r in post.get("reviews", []):
+            mark = "○" if r.get("행동") == "멈춰서 읽음" else "×"
+            tail = f" / {r['걸린점']}" if r.get("걸린점") else ""
+            lines.append(f"{mark} {r['이름']}({r['나이']}) \"{r.get('한마디','')}\"{tail}")
+        if s.get("진단"):
+            lines.append(f"→ {s['진단']}")
+
     lines += ["", "─" * 20, f"{post['slug']}"]
     return "\n".join(lines)
 

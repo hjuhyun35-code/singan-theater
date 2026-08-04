@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src import aladin, card, nlk, writer  # noqa: E402
+from src import aladin, card, nlk, reviewers, writer  # noqa: E402
 from src.aladin import affiliate_link  # noqa: E402
 from src.settings import load_config  # noqa: E402
 
@@ -128,6 +128,8 @@ def build_post(book: dict, copy: dict, slug: str, config: dict) -> dict:
         # 재료가 얼마나 두꺼웠는지. 사실만 남기고 판정은 하지 않습니다.
         "source_len": len(book.get("description") or ""),
         "toc_len": len(book.get("toc") or ""),
+        "reviews": [],
+        "review_summary": {},
         # 카드에 들어간 문구를 그대로 남깁니다.
         # 나중에 디자인만 바꿔 다시 그릴 때 모델을 또 부르지 않아도 됩니다.
         "slides": copy["slides"],
@@ -195,6 +197,16 @@ def main() -> int:
         )
 
         post = build_post(book, copy, slug, config)
+
+        # 독자들이 넘겨보고 반응을 남깁니다. 발행을 막지는 않습니다.
+        post["reviews"] = reviewers.review(book, copy, config)
+        post["review_summary"] = reviewers.summarize(post["reviews"])
+        if post["review_summary"]:
+            s = post["review_summary"]
+            print(
+                f"    독자 {s['인원']}명 — 멈춤 {s['멈춤']} / 넘김 {s['넘김']} / "
+                f"저장 {s['저장']} / 팔로우 {s['팔로우']}"
+            )
         for i, (src_path, slide) in enumerate(zip(paths, copy["slides"]), start=1):
             dest = out_dir / f"card{i}.jpg"
             Path(src_path).replace(dest)
