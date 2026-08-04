@@ -207,6 +207,7 @@ def main() -> int:
             config["발행"].get("색테마", "밤"),
             config["발행"].get("표지색_강조", True),
             config["발행"].get("뒷장_표지", "없음"),
+            config["발행"].get("카드_스타일", "기본"),
         )
 
         post = build_post(book, copy, slug, config)

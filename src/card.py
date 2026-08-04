@@ -69,6 +69,28 @@ def _cover_with_bytes(*urls: str) -> tuple[str, bytes]:
     return "", b""
 
 
+_EMPH = re.compile(r"\*([^*]+)\*")
+
+
+def _plain(text: str) -> str:
+    """강조 표시(*)를 걷어낸 순수 문자열. 글자 수를 셀 때 씁니다."""
+    return _EMPH.sub(r"\1", text).strip()
+
+
+def _split_emphasis(text: str) -> list[dict]:
+    """'앞말 *강조* 뒷말' 을 조각으로 나눕니다. 템플릿이 색을 입힙니다."""
+    parts: list[dict] = []
+    last = 0
+    for m in _EMPH.finditer(text):
+        if m.start() > last:
+            parts.append({"t": text[last : m.start()], "em": False})
+        parts.append({"t": m.group(1), "em": True})
+        last = m.end()
+    if last < len(text):
+        parts.append({"t": text[last:], "em": False})
+    return [p for p in parts if p["t"]]
+
+
 def build_slides(book: dict, copy: dict, credit: str = "") -> list[dict]:
     """생성된 문구를 카드 장별 데이터로 배치합니다."""
     slides = copy.get("slides") or []
@@ -77,11 +99,14 @@ def build_slides(book: dict, copy: dict, credit: str = "") -> list[dict]:
     for i, slide in enumerate(slides, start=1):
         kind = slide.get("type", "")
         prev_kind = slides[i - 2].get("type", "") if i > 1 else ""
+        headline = slide.get("headline", "") or ""
         rendered.append(
             {
                 "kind": kind,
                 "kicker": slide.get("kicker", ""),
-                "headline": slide.get("headline", ""),
+                "headline": _plain(headline),
+                # *별표* 로 감싼 부분은 강조색으로 칠합니다.
+                "headline_parts": _split_emphasis(headline),
                 "body": slide.get("body", ""),
                 # 줄바꿈으로 나눈 각 문장. 길어서 자동으로 넘어간 줄과
                 # 일부러 끊은 줄이 헷갈리지 않도록 문단으로 나눠 그립니다.
@@ -116,6 +141,7 @@ def render_cards(
     theme: str = "밤",
     accent_from_cover: bool = True,
     back_cover: str = "없음",
+    style: str = "기본",
 ) -> list[str]:
     """카드 이미지를 만들고 저장된 파일 경로 목록을 돌려줍니다.
 
@@ -148,6 +174,7 @@ def render_cards(
                     theme=theme,
                     accent=accent,
                     back_cover=back_cover,
+                    style=style,
                     **slide,
                 )
                 page.set_content(html, wait_until="load")
