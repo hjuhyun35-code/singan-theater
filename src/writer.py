@@ -27,6 +27,8 @@ SLIDE_TYPES = {
         "머릿속에 그림이 그려지게 하라. 한 줄이어도 좋다. "
         "  나쁜 예: '밤마다 시체처럼 돌아다니는 이웃' (뭉뚱그림) "
         "  좋은 예: '오후 2시, 길 건너 집 현관에 누가 서 있다' (그림이 그려짐) "
+        "★위 예문은 다른 책 이야기다. 절대 그대로 가져다 쓰지 마라. "
+        "  지금 읽은 소개글에 있는 사람·장소·사물로 새로 써라. "
         "kicker 는 '신간' 또는 분야 이름."
     ),
     "상황": (
@@ -330,15 +332,32 @@ def write_copy(book: dict, config: dict) -> dict:
             raise RuntimeError("Claude가 문구를 만들지 못했습니다.")
 
         overlap = longest_overlap(result["threads_text"], book["description"])
-        if overlap < COPY_OVERLAP_LIMIT or attempt == 1:
+        # 프롬프트에 든 예문을 그대로 베껴 오는 일이 실제로 있었습니다.
+        copied = next(
+            (
+                (s.get("headline", ""), ex)
+                for s in result.get("slides", [])
+                if (ex := borrowed_example(s.get("headline", "")))
+            ),
+            None,
+        )
+        if (overlap < COPY_OVERLAP_LIMIT and not copied) or attempt == 1:
             result["copy_overlap"] = overlap
             result["model"] = model
+            result["borrowed"] = copied[0] if copied else ""
             break
 
-        warning = (
-            f"\n\n[다시 작성] 방금 쓴 문구에 출판사 소개글과 {overlap}자가 "
-            "그대로 겹치는 부분이 있었다. 표현을 완전히 바꿔 다시 써라."
-        )
+        if copied:
+            warning = (
+                f"\n\n[다시 작성] 방금 쓴 '{copied[0]}' 는 지시문에 들어 있던 "
+                f"예문('{copied[1]}')을 거의 그대로 옮긴 것이다. 그 예문은 다른 책 이야기다. "
+                "지금 읽은 소개글에 실제로 나오는 사람·장소·사물로 새로 써라."
+            )
+        else:
+            warning = (
+                f"\n\n[다시 작성] 방금 쓴 문구에 출판사 소개글과 {overlap}자가 "
+                "그대로 겹치는 부분이 있었다. 표현을 완전히 바꿔 다시 써라."
+            )
 
     result["hashtags"] = _merge_hashtags(result.get("hashtags", []), config)
     result["threads_text"] = _trim(result["threads_text"])
@@ -348,6 +367,37 @@ def write_copy(book: dict, config: dict) -> dict:
         # 자료가 이만큼 짧으면 무슨 말을 쓰든 얕을 수밖에 없습니다.
         result["confidence"] = "low"
     return result
+
+
+# 프롬프트에 적어둔 예문들. 모델이 이걸 그대로 베껴 낸 적이 있습니다.
+# '테오' 카드에 '오후 2시, 길 건너 누군가 서 있다' 가 그대로 나왔습니다.
+# 전혀 다른 책인데도요. 그래서 나갈 때 한 번 더 봅니다.
+_EXAMPLES = (
+    "오후 2시 길 건너 집 현관에 누가 서 있다",
+    "밤마다 시체처럼 돌아다니는 이웃",
+    "수녀가 유튜버의 카메라 앞에 앉았다",
+    "신앙과 과학 맞부딪칠 때 무엇이 남는가",
+)
+
+
+def _bag(text: str) -> set[str]:
+    return set(re.sub(r"[^0-9A-Za-z가-힣 ]+", " ", text or "").split())
+
+
+def borrowed_example(headline: str) -> str:
+    """프롬프트 예문을 베껴 온 헤드라인이면 그 예문을 돌려줍니다.
+
+    낱말이 절반 넘게 겹치면 베낀 것으로 봅니다. 짧은 문장이라
+    우연히 그만큼 겹치기는 어렵습니다.
+    """
+    words = _bag(headline)
+    if len(words) < 3:
+        return ""
+    for example in _EXAMPLES:
+        shared = words & _bag(example)
+        if len(shared) / len(words) >= 0.5:
+            return example
+    return ""
 
 
 def mark_emphasis(headline: str, emphasis: str) -> str:

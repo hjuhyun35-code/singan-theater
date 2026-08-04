@@ -97,6 +97,9 @@ def fetch_list(query_type: str, category_id: int, max_results: int = 10) -> list
             "start": 1,
             "SearchTarget": "Book",
             "Cover": "Big",
+            # 평점·판매지수를 목록에서 같이 받아, 후보를 고를 때 상세 조회를
+            # 열 번씩 하지 않아도 되게 합니다.
+            "OptResult": "ratingInfo,itemPage",
         },
     )
 
@@ -149,9 +152,11 @@ def _parse_date(raw: str) -> date | None:
 
 # 알라딘은 같은 책의 판형·굿즈 상품을 제목 뒤 괄호로 구분합니다.
 # 이건 책 이름이 아니라 상품 이름이라 카드에 그대로 나오면 지저분합니다.
+# '(알라딘 리커버 특별판)', '(집 에디션)' 처럼 앞에 수식어가 붙기도 합니다.
+# 다만 괄호 안이 길면 부제일 수 있어, 짧은 괄호만 판형 표기로 봅니다.
 _EDITION = re.compile(
-    r"\s*[(\[]\s*(?:사인|친필|특별|한정|리커버|개정|양장|무선|스페셜|증보|합본|세트|"
-    r"보급|미니|박스|에디션|초판|기념)[^)\]]*[)\]]\s*$"
+    r"\s*[(\[]\s*[^)\]]{0,8}?(?:사인|친필|특별|한정|리커버|개정|양장|무선|스페셜|증보|"
+    r"합본|세트|보급|미니|박스|에디션|초판|기념|반양장)[^)\]]{0,8}[)\]]\s*$"
 )
 
 
@@ -168,6 +173,21 @@ def _strip_edition(title: str) -> str:
             break
         out = trimmed
     return out or title.strip()
+
+
+def _int(value) -> int:
+    """알라딘은 빈 칸을 '' 로도 보내고 아예 안 보내기도 합니다."""
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return 0
+
+
+def _float(value) -> float:
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def normalize(raw: dict, detail: dict | None = None) -> dict:
@@ -197,7 +217,15 @@ def normalize(raw: dict, detail: dict | None = None) -> dict:
         "category": _clean(d.get("categoryName")),
         "description": description,
         "toc": toc[:3000],
-        "page_count": d.get("itemPage", ""),
+        "page_count": _int(d.get("itemPage")),
+        # 얼마나 읽힌 책인지. 소개글이 짧아도 이건 사실이라 그대로 쓸 수 있습니다.
+        # rank(0~10)와 salesPoint 는 목록 응답에도 들어 있어 후보를 고를 때 씁니다.
+        # review_count 는 상세 조회(ratingInfo)에서만 옵니다.
+        "rating_rank": _int(d.get("customerReviewRank")),
+        "rating_score": _float(d.get("ratingScore")),
+        "rating_count": _int(d.get("ratingCount")),
+        "review_count": _int(d.get("myReviewCount")),
+        "sales_point": _int(d.get("salesPoint")),
     }
 
 

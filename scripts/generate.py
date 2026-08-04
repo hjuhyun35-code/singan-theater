@@ -87,6 +87,62 @@ def within_window(book: dict, config: dict) -> bool:
     )
 
 
+def is_read(book: dict, config: dict) -> tuple[bool, str]:
+    """읽은 사람이 있는 책인지 봅니다.
+
+    갓 나온 책은 평점도 판매지수도 0입니다. 소개글은 어차피 200자뿐이라
+    모델이 그 빈 곳을 상상으로 채웁니다. 읽힌 책이면 적어도 모델이 아는
+    책일 확률이 높고, 우리가 카드에 적을 사실(평점·리뷰 수)도 생깁니다.
+    """
+    rank = book.get("rating_rank", 0)
+    sales = book.get("sales_point", 0)
+    min_rank = int(config["수집"].get("최소_평점순위", 0))
+    min_sales = int(config["수집"].get("최소_판매지수", 0))
+    if rank < min_rank:
+        return False, f"평점순위 {rank} < {min_rank}"
+    if sales < min_sales:
+        return False, f"판매지수 {sales} < {min_sales}"
+    return True, f"평점순위 {rank} · 판매지수 {sales}"
+
+
+def build_shortlist(candidates: list[dict], seen: dict, config: dict) -> list[dict]:
+    """후기가 쌓인 책만 남기고, 많이 읽힌 순으로 줄 세웁니다.
+
+    목록 응답에는 평점순위·판매지수만 들어 있고 후기 수는 없습니다.
+    그래서 싼 조건으로 먼저 60권을 열 권 안팎으로 줄인 뒤,
+    남은 것만 상세 조회해 후기 수를 봅니다. 조회 횟수를 아끼려는 순서입니다.
+    """
+    rough = [
+        b
+        for b in candidates
+        if b["isbn13"] not in seen
+        and within_window(b, config)
+        and is_read(b, config)[0]
+    ]
+    print(f"  기간·판매 조건 통과 {len(rough)}권. 후기 수를 확인합니다.")
+
+    min_reviews = int(config["수집"].get("최소_리뷰수", 0))
+    picked: list[dict] = []
+    for rough_book in rough:
+        try:
+            detail = aladin.fetch_detail(rough_book["isbn13"])
+        except RuntimeError as exc:
+            print(f"  ! 상세정보 실패 [{rough_book['title']}]: {exc}")
+            continue
+        book = aladin.normalize(detail) if detail else rough_book
+        if book.get("review_count", 0) < min_reviews:
+            print(
+                f"  - 건너뜀 [{book['title']}]: 후기 "
+                f"{book.get('review_count', 0)}건 (기준 {min_reviews}건)"
+            )
+            continue
+        picked.append(book)
+
+    # 많이 읽힌 책일수록 모델이 실제로 아는 책이라 지어낼 여지가 줄어듭니다.
+    picked.sort(key=lambda b: b.get("review_count", 0), reverse=True)
+    return picked
+
+
 def build_credit(book: dict, config: dict) -> str:
     """실제로 쓴 자료의 출처만 표기합니다. 안 쓴 곳을 적으면 거짓말이 됩니다."""
     if not config["제휴"].get("출처표기_사용"):
@@ -128,6 +184,11 @@ def build_post(book: dict, copy: dict, slug: str, config: dict) -> dict:
         # 재료가 얼마나 두꺼웠는지. 사실만 남기고 판정은 하지 않습니다.
         "source_len": len(book.get("description") or ""),
         "toc_len": len(book.get("toc") or ""),
+        # 얼마나 읽힌 책인지. 승인할 때 판단 근거로 텔레그램에 같이 띄웁니다.
+        "rating_score": book.get("rating_score", 0.0),
+        "rating_count": book.get("rating_count", 0),
+        "review_count": book.get("review_count", 0),
+        "sales_point": book.get("sales_point", 0),
         "reviews": [],
         "review_summary": {},
         # 카드에 들어간 문구를 그대로 남깁니다.
@@ -146,24 +207,16 @@ def main() -> int:
     limit = int(os.environ.get("DRAFT_COUNT") or config["수집"]["하루_초안수"])
     seen = load_seen()
 
-    print("신간 목록을 가져오는 중...")
+    print("책 목록을 가져오는 중...")
     candidates = pick_candidates(config)
-    print(f"후보 {len(candidates)}권. 여기서 {limit}권을 고릅니다.\n")
+    print(f"후보 {len(candidates)}권.")
+    shortlist = build_shortlist(candidates, seen, config)
+    print(f"후기가 쌓인 책 {len(shortlist)}권. 여기서 {limit}권을 고릅니다.\n")
 
     made: list[str] = []
-    for book in candidates:
+    for book in shortlist:
         if len(made) >= limit:
             break
-        if book["isbn13"] in seen or not within_window(book, config):
-            continue
-
-        try:
-            detail = aladin.fetch_detail(book["isbn13"])
-        except RuntimeError as exc:
-            print(f"  ! 상세정보 실패 [{book['title']}]: {exc}")
-            continue
-        if detail:
-            book = aladin.normalize(detail)
 
         # 알라딘 기본 등급은 목차·전체 소개글을 안 줍니다. 국중에서 보강합니다.
         before = len(book["description"])
