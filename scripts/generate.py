@@ -16,13 +16,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src import aladin, card, nlk, reviewers, writer  # noqa: E402
+from src import aladin, card, nlk, research, reviewers, writer  # noqa: E402
 from src.aladin import affiliate_link  # noqa: E402
 from src.settings import load_config  # noqa: E402
 
 POSTS = ROOT / "posts"
 SEEN_PATH = POSTS / "seen.json"
 MIN_DESCRIPTION = 80
+# 웹 자료가 이만큼 모이면 소개글이 얇아도 지어내지 않고 쓸 수 있습니다.
+RESEARCH_ENOUGH = 400
 
 
 def load_seen() -> dict:
@@ -49,12 +51,12 @@ def next_slug() -> str:
     raise RuntimeError("오늘 슬러그가 99개를 넘었습니다.")
 
 
-def pick_candidates(config: dict) -> list[dict]:
+def pick_candidates(config: dict, tray: dict) -> list[dict]:
     per_source = int(config["수집"]["분야당_후보수"])
     buckets: list[list[dict]] = []
     for genre in config["분야"]["목록"]:
         found: dict[str, dict] = {}
-        for query_type in config["수집"]["종류"]:
+        for query_type in tray["종류"]:
             try:
                 items = aladin.fetch_list(query_type, genre["카테고리ID"], per_source)
             except RuntimeError as exc:
@@ -75,19 +77,15 @@ def pick_candidates(config: dict) -> list[dict]:
     return merged
 
 
-def within_window(book: dict, config: dict) -> bool:
+def within_window(book: dict, tray: dict) -> bool:
     pub = book.get("pub_date_obj")
     if pub is None:
         return True
     age = (date.today() - pub).days
-    return (
-        int(config["수집"]["최소_출간후_경과일"])
-        <= age
-        <= int(config["수집"]["최대_출간후_경과일"])
-    )
+    return int(tray["최소_출간후_경과일"]) <= age <= int(tray["최대_출간후_경과일"])
 
 
-def is_read(book: dict, config: dict) -> tuple[bool, str]:
+def is_read(book: dict, tray: dict) -> tuple[bool, str]:
     """읽은 사람이 있는 책인지 봅니다.
 
     갓 나온 책은 평점도 판매지수도 0입니다. 소개글은 어차피 200자뿐이라
@@ -96,8 +94,8 @@ def is_read(book: dict, config: dict) -> tuple[bool, str]:
     """
     rank = book.get("rating_rank", 0)
     sales = book.get("sales_point", 0)
-    min_rank = int(config["수집"].get("최소_평점순위", 0))
-    min_sales = int(config["수집"].get("최소_판매지수", 0))
+    min_rank = int(tray.get("최소_평점순위", 0))
+    min_sales = int(tray.get("최소_판매지수", 0))
     if rank < min_rank:
         return False, f"평점순위 {rank} < {min_rank}"
     if sales < min_sales:
@@ -105,7 +103,7 @@ def is_read(book: dict, config: dict) -> tuple[bool, str]:
     return True, f"평점순위 {rank} · 판매지수 {sales}"
 
 
-def build_shortlist(candidates: list[dict], seen: dict, config: dict) -> list[dict]:
+def build_shortlist(candidates: list[dict], seen: dict, tray: dict) -> list[dict]:
     """후기가 쌓인 책만 남기고, 많이 읽힌 순으로 줄 세웁니다.
 
     목록 응답에는 평점순위·판매지수만 들어 있고 후기 수는 없습니다.
@@ -116,12 +114,12 @@ def build_shortlist(candidates: list[dict], seen: dict, config: dict) -> list[di
         b
         for b in candidates
         if b["isbn13"] not in seen
-        and within_window(b, config)
-        and is_read(b, config)[0]
+        and within_window(b, tray)
+        and is_read(b, tray)[0]
     ]
     print(f"  기간·판매 조건 통과 {len(rough)}권. 후기 수를 확인합니다.")
 
-    min_reviews = int(config["수집"].get("최소_리뷰수", 0))
+    min_reviews = int(tray.get("최소_리뷰수", 0))
     picked: list[dict] = []
     for rough_book in rough:
         try:
@@ -202,20 +200,22 @@ def build_post(book: dict, copy: dict, slug: str, config: dict) -> dict:
     }
 
 
-def main() -> int:
-    config = load_config()
-    limit = int(os.environ.get("DRAFT_COUNT") or config["수집"]["하루_초안수"])
-    seen = load_seen()
+def run_tray(tray: dict, seen: dict, config: dict, made: list[str]) -> None:
+    """묶음 하나(신간 또는 베스트셀러)에서 정해진 수만큼 초안을 만듭니다."""
+    limit = int(os.environ.get("DRAFT_COUNT") or tray.get("초안수", 1))
+    if limit <= 0:
+        print(f"[{tray['이름']}] 초안수 0 — 건너뜁니다.\n")
+        return
 
-    print("책 목록을 가져오는 중...")
-    candidates = pick_candidates(config)
-    print(f"후보 {len(candidates)}권.")
-    shortlist = build_shortlist(candidates, seen, config)
-    print(f"후기가 쌓인 책 {len(shortlist)}권. 여기서 {limit}권을 고릅니다.\n")
+    print(f"[{tray['이름']}] 책 목록을 가져오는 중...")
+    candidates = pick_candidates(config, tray)
+    print(f"  후보 {len(candidates)}권.")
+    shortlist = build_shortlist(candidates, seen, tray)
+    print(f"  조건 통과 {len(shortlist)}권. 여기서 {limit}권을 고릅니다.\n")
 
-    made: list[str] = []
+    picked = 0
     for book in shortlist:
-        if len(made) >= limit:
+        if picked >= limit:
             break
 
         # 알라딘 기본 등급은 목차·전체 소개글을 안 줍니다. 국중에서 보강합니다.
@@ -232,16 +232,36 @@ def main() -> int:
             seen[book["isbn13"]] = {"title": book["title"], "skipped": "소개글 부족"}
             continue
 
+        # 소개글이 얇아도 웹에서 줄거리를 찾아오면 지어내지 않고 쓸 수 있습니다.
+        found = {"notes": "", "sources": [], "searches": 0}
+        if tray.get("자료_검색"):
+            print(f"  · 자료 찾는 중: {book['title']}")
+            found = research.gather(book, config)
+            if found.get("error"):
+                print(f"    ! 검색 실패: {found['error']}")
+            else:
+                print(
+                    f"    검색 {found['searches']}회 · 자료 {len(found['notes'])}자 · "
+                    f"출처 {len(found['sources'])}곳"
+                )
+
         # 출간 이력만 적힌 소개글이면 모델이 빈 곳을 상상으로 채웁니다. 미리 거릅니다.
-        ok, why = writer.has_material(book, config)
-        if not ok:
-            print(f"  - 건너뜀 [{book['title']}]: 책 내용이 없는 소개글 ({why})")
-            seen[book["isbn13"]] = {"title": book["title"], "skipped": f"재료 없음: {why}"}
-            continue
+        # 웹에서 줄거리를 충분히 찾았다면 그게 재료가 되므로 이 검사를 건너뜁니다.
+        if len(found["notes"]) >= RESEARCH_ENOUGH:
+            print(f"    재료 검사 생략 — 웹 자료 {len(found['notes'])}자로 충분합니다")
+        else:
+            ok, why = writer.has_material(book, config)
+            if not ok:
+                print(f"  - 건너뜀 [{book['title']}]: 책 내용이 없는 소개글 ({why})")
+                seen[book["isbn13"]] = {
+                    "title": book["title"],
+                    "skipped": f"재료 없음: {why}",
+                }
+                continue
 
         print(f"  · 작성 중: {book['title']}")
         try:
-            copy = writer.write_copy(book, config)
+            copy = writer.write_copy(book, config, found["notes"])
         except Exception as exc:
             print(f"  ! 문구 생성 실패 [{book['title']}]: {exc}")
             continue
@@ -264,6 +284,9 @@ def main() -> int:
         )
 
         post = build_post(book, copy, slug, config)
+        post["tray"] = tray["이름"]
+        post["research_len"] = len(found["notes"])
+        post["research_sources"] = found["sources"]
 
         # 독자들이 넘겨보고 반응을 남깁니다. 발행을 막지는 않습니다.
         post["reviews"] = reviewers.review(book, copy, config)
@@ -284,11 +307,25 @@ def main() -> int:
         )
         seen[book["isbn13"]] = {"title": book["title"], "slug": slug}
         made.append(slug)
+        picked += 1
 
         print(
             f"    → {slug} 카드 {len(post['cards'])}장 "
-            f"(원문 {post['source_len']}자)\n"
+            f"(원문 {post['source_len']}자 + 웹자료 {post['research_len']}자)\n"
         )
+
+
+def main() -> int:
+    config = load_config()
+    seen = load_seen()
+    made: list[str] = []
+
+    for tray in config["수집"]["묶음"]:
+        try:
+            run_tray(tray, seen, config, made)
+        except Exception as exc:
+            # 한 묶음이 넘어져도 다른 묶음은 살립니다.
+            print(f"! [{tray.get('이름', '?')}] 묶음 실패: {exc}\n")
 
     save_seen(seen)
 
