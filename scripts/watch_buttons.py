@@ -133,9 +133,16 @@ def main() -> int:
     deadline = time.time() + minutes * 60
     offset = None
     handled = 0
-    print(f"버튼을 {minutes}분 동안 기다립니다.")
+    # flush 를 켜야 로그가 실시간으로 보입니다. 안 그러면 끝날 때 한꺼번에 나옵니다.
+    print(f"버튼을 {minutes}분 동안 기다립니다.", flush=True)
+    next_beat = time.time() + 600
 
     while time.time() < deadline:
+        if time.time() >= next_beat:
+            left = int((deadline - time.time()) / 60)
+            print(f"  ...대기 중 (남은 시간 {left}분, 처리 {handled}건)", flush=True)
+            next_beat = time.time() + 600
+
         params = {"timeout": LONG_POLL, "allowed_updates": json.dumps(["callback_query"])}
         if offset is not None:
             params["offset"] = offset

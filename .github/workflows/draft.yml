@@ -14,9 +14,16 @@ on:
 permissions:
   contents: write
 
+# 감시자가 둘 이상 돌면 서로 버튼 눌림을 가져가 버립니다.
+# 새로 시작한 쪽이 이어받고 이전 것은 멈춥니다. (밀린 눌림은 새 감시자가 그대로 받습니다)
+concurrency:
+  group: telegram-watch
+  cancel-in-progress: true
+
 jobs:
   draft:
     runs-on: ubuntu-latest
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
 
@@ -74,7 +81,8 @@ jobs:
 
       - name: 버튼 기다리기
         # 텔레그램에서 '승인하고 올리기' 를 누르면 여기서 바로 발행합니다.
-        # 이 시간이 지난 뒤 누른 것은 '버튼 확인' 워크플로로 처리됩니다.
+        # 아침 8시 알림 후 오후 1시 반까지 지켜봅니다.
+        # 그보다 늦게 누른 것은 '버튼 확인' 워크플로를 한 번 돌리면 처리됩니다.
         if: steps.gen.outputs.count != '0'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -82,5 +90,5 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
-          WATCH_MINUTES: "30"
+          WATCH_MINUTES: "330"
         run: python scripts/watch_buttons.py

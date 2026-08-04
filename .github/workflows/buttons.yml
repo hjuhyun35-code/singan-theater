@@ -16,9 +16,16 @@ on:
 permissions:
   contents: write
 
+# 초안 워크플로의 감시자와 겹치지 않게 합니다. 이걸 돌리면 그쪽 감시는 멈추고
+# 밀려 있던 버튼 눌림을 이쪽이 받아 처리합니다.
+concurrency:
+  group: telegram-watch
+  cancel-in-progress: true
+
 jobs:
   watch:
     runs-on: ubuntu-latest
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
 
