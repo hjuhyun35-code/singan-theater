@@ -3,12 +3,42 @@
 <head>
 <meta charset="utf-8">
 <style>
+  /* ── 색 테마. config.json 의 '발행 → 색테마' 로 고릅니다 ── */
+  :root {
+    --bg-a: #26221C; --bg-b: #12100E;   /* 배경 (위/아래 그라데이션) */
+    --ink: #F5F1EA;                      /* 큰 글씨 */
+    --ink-soft: #CFC7B8;                 /* 본문 */
+    --ink-dim: #857D71;                  /* 하단 표기 */
+    --accent: #D4AF6A;                   /* 강조 */
+    --line: rgba(245,241,234,0.12);      /* 구분선 */
+    --frame: rgba(212,175,106,0.20);     /* 바깥 테두리 */
+    --shadow: rgba(0,0,0,0.66);
+  }
+  body.t-아이보리 {
+    --bg-a: #FBF6EC; --bg-b: #F3EADA;
+    --ink: #241F19; --ink-soft: #4A4137; --ink-dim: #8C8172;
+    --accent: #B4703A; --line: rgba(36,31,25,0.14);
+    --frame: rgba(180,112,58,0.28); --shadow: rgba(90,70,45,0.22);
+  }
+  body.t-종이 {
+    --bg-a: #FFFFFF; --bg-b: #F4F4F2;
+    --ink: #141414; --ink-soft: #3D3D3D; --ink-dim: #8A8A8A;
+    --accent: #E23E2C; --line: rgba(20,20,20,0.12);
+    --frame: rgba(20,20,20,0.10); --shadow: rgba(0,0,0,0.18);
+  }
+  body.t-쪽빛 {
+    --bg-a: #16233A; --bg-b: #0E1626;
+    --ink: #F2F5FA; --ink-soft: #BFCADB; --ink-dim: #7A8699;
+    --accent: #7FB3E8; --line: rgba(242,245,250,0.13);
+    --frame: rgba(127,179,232,0.22); --shadow: rgba(0,0,0,0.6);
+  }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   html, body {
     width: 1080px;
     height: 1350px;
-    background: #12100E;
+    background: var(--bg-b);
     /* 윈도우(맑은 고딕) / 리눅스 CI(노토) 양쪽에서 한글이 나오게 */
     font-family: "Pretendard", "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo",
                  "Noto Sans CJK KR", "Noto Sans KR", sans-serif;
@@ -22,8 +52,8 @@
     padding: 104px 92px 96px;
     display: flex;
     flex-direction: column;
-    color: #F5F1EA;
-    background: radial-gradient(120% 90% at 15% 0%, #26221C 0%, #12100E 62%);
+    color: var(--ink);
+    background: radial-gradient(120% 90% at 15% 0%, var(--bg-a) 0%, var(--bg-b) 62%);
     overflow: hidden;
   }
 
@@ -31,7 +61,7 @@
     content: "";
     position: absolute;
     inset: 44px;
-    border: 1px solid rgba(212, 175, 106, 0.20);
+    border: 1px solid var(--frame);
     pointer-events: none;
   }
 
@@ -43,7 +73,6 @@
     justify-content: center;
     min-height: 0;
   }
-  /* 표지 아래 남는 공간에 본문을 가운데로 모읍니다. 본문이 짧을 때 허전해지지 않게. */
   .cover-slide .content { justify-content: center; padding-top: 8px; }
   .outro .content { align-items: center; text-align: center; }
 
@@ -51,7 +80,7 @@
     font-size: 29px;
     font-weight: 700;
     letter-spacing: 0.24em;
-    color: #D4AF6A;
+    color: var(--accent);
     margin-bottom: 34px;
   }
 
@@ -59,7 +88,8 @@
   .cont {
     font-size: 44px;
     line-height: 1;
-    color: rgba(212, 175, 106, 0.65);
+    color: var(--accent);
+    opacity: 0.7;
     letter-spacing: 0.1em;
     margin-bottom: 30px;
   }
@@ -77,7 +107,7 @@
   .rule {
     width: 92px;
     height: 5px;
-    background: #D4AF6A;
+    background: var(--accent);
     margin: 44px 0;
     flex: none;
   }
@@ -86,23 +116,24 @@
   .body {
     font-size: 39px;
     line-height: 1.66;
-    color: #CFC7B8;
+    color: var(--ink-soft);
     word-break: keep-all;
   }
   /* 일부러 끊은 줄 사이는 벌려서, 길어서 넘어간 줄과 구분되게 합니다 */
   .body p + p { margin-top: 0.62em; }
 
   /* 헤드라인 없이 본문만 있는 카드 — 본문이 제목 역할을 하도록 키웁니다 */
-  .body.lead { font-size: 46px; line-height: 1.62; color: #E4DDD0; }
+  .body.lead { font-size: 46px; line-height: 1.62; color: var(--ink); }
   .k-이야기 .body.lead { font-size: 44px; }
 
   /* '상황' '이야기' 카드 — 우리가 만든 예시라는 게 눈으로도 구분되도록 */
   .k-상황 .content,
-  .k-이야기 .content { border-left: 4px solid rgba(212, 175, 106, 0.45); padding-left: 40px; }
+  .k-이야기 .content {
+    border-left: 4px solid var(--accent);
+    padding-left: 40px;
+  }
   .k-상황 .headline,
   .k-이야기 .headline { font-weight: 700; }
-  .k-상황 .body,
-  .k-이야기 .body { color: #BDB4A5; }
 
   /* '이야기' 카드 — 본문이 길어 헤드라인을 낮추고 줄 간격을 넓힙니다 */
   .k-이야기 .headline { font-size: 58px; }
@@ -117,8 +148,8 @@
   .meta {
     flex: none;
     font-size: 27px;
-    color: #857D71;
-    border-top: 1px solid rgba(245, 241, 234, 0.12);
+    color: var(--ink-dim);
+    border-top: 1px solid var(--line);
     padding-top: 30px;
     margin-top: 56px;
     display: flex;
@@ -127,13 +158,13 @@
     gap: 24px;
   }
   .meta .book {
-    color: #B4AB9D;
+    color: var(--ink-dim);
     max-width: 700px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .meta .page-no { color: #D4AF6A; font-weight: 700; font-size: 29px; white-space: nowrap; }
+  .meta .page-no { color: var(--accent); font-weight: 700; font-size: 29px; white-space: nowrap; }
   .outro .meta { justify-content: center; }
   .outro .meta .book { max-width: 100%; }
 
@@ -142,7 +173,8 @@
     flex: none;
     margin-top: 14px;
     font-size: 21px;
-    color: #6E675D;
+    color: var(--ink-dim);
+    opacity: 0.85;
     text-align: center;
     letter-spacing: 0.01em;
   }
@@ -160,7 +192,7 @@
     width: 286px;
     flex: 0 0 286px;
     border-radius: 5px;
-    box-shadow: 0 26px 58px rgba(0, 0, 0, 0.66);
+    box-shadow: 0 26px 58px var(--shadow);
     display: block;
   }
 
@@ -177,7 +209,7 @@
 
   .cover-side .byline {
     font-size: 27px;
-    color: #9C9385;
+    color: var(--ink-dim);
     line-height: 1.62;
     word-break: keep-all;
   }
@@ -187,7 +219,7 @@
     flex: none;
     margin-bottom: 56px;
     padding-bottom: 40px;
-    border-bottom: 1px solid rgba(245, 241, 234, 0.12);
+    border-bottom: 1px solid var(--line);
   }
   .titleblock .title {
     font-size: 52px;
@@ -197,10 +229,10 @@
     word-break: keep-all;
     margin-bottom: 18px;
   }
-  .titleblock .byline { font-size: 28px; color: #9C9385; }
+  .titleblock .byline { font-size: 28px; color: var(--ink-dim); }
 </style>
 </head>
-<body>
+<body class="t-{{ theme or '밤' }}">
 <div class="card k-{{ kind }} {{ 'cover-slide' if show_cover else '' }} {{ 'outro' if is_outro else '' }}">
 
   {% if show_cover %}

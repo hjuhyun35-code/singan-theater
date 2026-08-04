@@ -5,8 +5,12 @@ readers.json 의 사람들이 각자 따로 답합니다.
 
   .venv\\Scripts\\python.exe tools\\ask_readers.py "질문" 보기1 보기2 보기3
   .venv\\Scripts\\python.exe tools\\ask_readers.py "질문"          # 보기 없이 자유 답변
+
+이미지를 같이 보여주려면 --img 로 파일을 붙입니다. 보기 순서와 같은 순서로 넣으세요.
+  ... "질문" 밤 아이보리 --img out/밤.jpg --img out/아이보리.jpg
 """
 
+import base64
 import sys
 from collections import Counter
 from pathlib import Path
@@ -52,13 +56,32 @@ def build_tool(choices: list[str]) -> dict:
     }
 
 
+def image_block(path: Path) -> dict:
+    """이미지를 모델이 볼 수 있는 형태로 감쌉니다."""
+    return {
+        "type": "image",
+        "source": {
+            "type": "base64",
+            "media_type": "image/jpeg",
+            "data": base64.b64encode(path.read_bytes()).decode("ascii"),
+        },
+    }
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print(__doc__)
         return 2
 
-    question = sys.argv[1]
-    choices = sys.argv[2:]
+    args = sys.argv[1:]
+    images: list[Path] = []
+    while "--img" in args:
+        i = args.index("--img")
+        images.append(Path(args[i + 1]))
+        del args[i : i + 2]
+
+    question = args[0]
+    choices = args[1:]
     readers = load_readers()
     client = Anthropic(api_key=env("ANTHROPIC_API_KEY", required=True))
     model = load_config()["모델"]["이름"]
@@ -67,7 +90,17 @@ def main() -> int:
     print(f"질문: {question}")
     if choices:
         print(f"보기: {' / '.join(choices)}")
+    if images:
+        print(f"보여줄 그림 {len(images)}장: {', '.join(p.name for p in images)}")
     print()
+
+    # 그림을 먼저 보여주고, 어느 게 어느 보기인지 이름을 붙여줍니다.
+    content: list[dict] = []
+    for i, path in enumerate(images):
+        label = choices[i] if i < len(choices) else path.stem
+        content.append({"type": "text", "text": f"[{label}]"})
+        content.append(image_block(path))
+    content.append({"type": "text", "text": question})
 
     picks = Counter()
     for r in readers:
@@ -79,7 +112,7 @@ def main() -> int:
                 system=f"{SYSTEM}\n\n{who}",
                 tools=[tool],
                 tool_choice={"type": "tool", "name": "opinion"},
-                messages=[{"role": "user", "content": question}],
+                messages=[{"role": "user", "content": content}],
             )
             got = next((b.input for b in msg.content if b.type == "tool_use"), None)
         except Exception as exc:

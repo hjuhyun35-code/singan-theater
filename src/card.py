@@ -100,7 +100,11 @@ def build_slides(book: dict, copy: dict, credit: str = "") -> list[dict]:
 
 
 def render_cards(
-    book: dict, copy: dict, use_cover: bool = True, credit: str = ""
+    book: dict,
+    copy: dict,
+    use_cover: bool = True,
+    credit: str = "",
+    theme: str = "밤",
 ) -> list[str]:
     """카드 이미지를 만들고 저장된 파일 경로 목록을 돌려줍니다.
 
@@ -126,7 +130,7 @@ def render_cards(
         page = browser.new_page(viewport={"width": WIDTH, "height": HEIGHT})
         try:
             for slide in slides:
-                html = template.render(cover_url=cover, **slide)
+                html = template.render(cover_url=cover, theme=theme, **slide)
                 page.set_content(html, wait_until="load")
                 page.wait_for_timeout(120)  # 폰트가 자리를 잡을 시간
                 out = CARD_DIR / f"{prefix}_{slide['index']}.jpg"
