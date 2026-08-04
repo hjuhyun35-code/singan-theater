@@ -44,12 +44,44 @@ def answer(token: str, query_id: str, text: str) -> None:
         pass
 
 
-def replace_message(token: str, chat_id: int, message_id: int, text: str) -> None:
-    """버튼을 없애고 결과 문구로 바꿔, 두 번 누르는 실수를 막습니다."""
+def locked(label: str) -> str:
+    """처리가 끝났음을 보여주는 잠긴 버튼. 눌러도 아무 일 없습니다."""
+    return json.dumps(
+        {"inline_keyboard": [[{"text": label, "callback_data": "done"}]]}
+    )
+
+
+def original_buttons(slug: str) -> str:
+    """실패했을 때 되돌려 놓을 원래 버튼."""
+    return json.dumps(
+        {
+            "inline_keyboard": [
+                [
+                    {"text": "✅ 승인하고 올리기", "callback_data": f"pub:{slug}"},
+                    {"text": "✕ 버리기", "callback_data": f"skip:{slug}"},
+                ]
+            ]
+        }
+    )
+
+
+def replace_message(
+    token: str, chat_id: int, message_id: int, text: str, markup: str
+) -> None:
+    """메시지를 결과로 바꿉니다.
+
+    ★버튼을 반드시 다시 넘겨야 합니다. 안 넘기면 텔레그램이 버튼을 지워버려서,
+      발행이 실패했을 때 다시 누를 데가 없어집니다.
+    """
     try:
         call(
             "editMessageText",
-            {"chat_id": chat_id, "message_id": message_id, "text": text},
+            {
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": text,
+                "reply_markup": markup,
+            },
             token,
         )
     except (requests.RequestException, RuntimeError):
@@ -87,6 +119,10 @@ def handle(update: dict, token: str, repo: str) -> bool:
     if not q:
         return False
     data = q.get("data", "")
+    if data == "done":
+        # 이미 처리된 글의 잠긴 버튼. 눌러도 아무 일 없다고만 알려줍니다.
+        answer(token, q["id"], "이미 처리된 글입니다")
+        return False
     if ":" not in data:
         return False
 
@@ -98,7 +134,9 @@ def handle(update: dict, token: str, repo: str) -> bool:
         mark_skipped(slug)
         commit(f"건너뜀 {slug}")
         answer(token, q["id"], "넘겼습니다")
-        replace_message(token, chat_id, message_id, f"✕ {slug} — 올리지 않았습니다")
+        replace_message(
+            token, chat_id, message_id, f"🗑 버렸습니다 — {slug}", locked("🗑 버림")
+        )
         print(f"건너뜀: {slug}")
         return True
 
@@ -109,14 +147,27 @@ def handle(update: dict, token: str, repo: str) -> bool:
     try:
         out = publish_slug(slug, repo)
     except Exception as exc:
-        print(f"발행 실패 {slug}: {exc}")
-        replace_message(token, chat_id, message_id, f"⚠️ {slug} 발행 실패\n\n{exc}")
+        already = "이미 발행" in str(exc)
+        print(f"발행 {'생략' if already else '실패'} {slug}: {exc}")
+        replace_message(
+            token,
+            chat_id,
+            message_id,
+            (f"✅ 이미 올라간 글입니다 — {slug}" if already else f"❌ {slug} 발행 실패\n\n{exc}"),
+            # 실패면 원래 버튼을 되돌려 놓습니다. 고친 뒤 같은 자리에서 다시 누르면 됩니다.
+            locked("✅ 올라감") if already else original_buttons(slug),
+        )
         return True
 
     commit(f"발행 {slug}")
     where = ", ".join(out["results"])
     replace_message(
-        token, chat_id, message_id, f"✅ 올렸습니다 — {out['title']}\n({where})"
+        token,
+        chat_id,
+        message_id,
+        f"✅ 올라갔습니다 — {out['title']}\n({where})\n"
+        f"https://www.instagram.com/singan.theater/",
+        locked("✅ 올라감"),
     )
     print(f"발행 완료: {slug} → {out['results']}")
     return True
