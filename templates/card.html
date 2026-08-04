@@ -291,10 +291,21 @@
     box-shadow: inset 0 0 200px 70px rgba(0, 0, 0, 0.62);
   }
 
-  .s-포스터 .cover-wrap { margin-bottom: 18px; }
+  /* 표지 자리를 크게 잡고, 글이 길면 그만큼만 알아서 줄어듭니다.
+     height + flex-shrink 조합이라 넘치는 일이 없습니다. */
+  /* 글이 먼저 제 크기를 가져가고, 표지가 '남는 공간'을 채웁니다.
+     이래야 글이 길어도 라벨이 표지 위로 밀려 올라가 겹치지 않습니다. */
+  .s-포스터 .cover-slide .content { flex: 0 0 auto; }
+  .s-포스터 .cover-wrap {
+    margin-bottom: 16px;
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 700px;
+    align-items: flex-start;
+  }
   .s-포스터 .cover {
-    max-width: 450px;
-    max-height: 520px;
+    max-width: 560px;
+    max-height: 100%;
     border-radius: 3px;
     box-shadow:
       0 0 4px color-mix(in srgb, var(--accent) 90%, transparent),
