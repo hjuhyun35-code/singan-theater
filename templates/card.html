@@ -3,6 +3,19 @@
 <head>
 <meta charset="utf-8">
 <style>
+{% if display_font %}
+  /* 포스터 제목용 굵은 한글 글꼴(검은고딕, OFL).
+     파일을 HTML 안에 통째로 심습니다 — set_content 에는 기준 주소가 없어서
+     상대 경로로는 글꼴을 못 찾습니다. 파일이 없으면 이 블록 자체가 빠지고
+     기본 고딕으로 조용히 되돌아갑니다. */
+  @font-face {
+    font-family: "포스터체";
+    src: url("{{ display_font }}") format("truetype");
+    font-weight: 400;
+    font-display: block;
+  }
+{% endif %}
+
   /* ── 색 테마. config.json 의 '발행 → 색테마' 로 고릅니다 ── */
   :root {
     --bg-a: #26221C; --bg-b: #12100E;   /* 배경 (위/아래 그라데이션) */
@@ -269,10 +282,26 @@
 
   .s-포스터 .card {
     padding: 62px 64px 58px;
-    background:
+    /* 맨 위 = 콘크리트 얼룩, 그 아래 = 오른쪽 위 색 번짐, 맨 아래 = 바탕색.
+       얼룩은 overlay 로 섞어야 밝은 테마에서도 배경을 까맣게 덮지 않습니다. */
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1080' height='1350'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.009' numOctaves='5' seed='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='1080' height='1350' filter='url(%23b)'/%3E%3C/svg%3E"),
+      radial-gradient(70% 55% at 88% 22%,
+        color-mix(in srgb, var(--accent) 26%, transparent) 0%, transparent 70%),
       radial-gradient(120% 80% at 50% 8%,
         color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 55%),
       radial-gradient(140% 100% at 50% 50%, var(--bg-a) 0%, var(--bg-b) 70%);
+    background-blend-mode: overlay, normal, normal, normal;
+  }
+  /* 인쇄물처럼 안쪽에 얇은 테두리 한 줄. card 가 아니라 body 에 두는 이유는
+     card::before/::after 가 이미 잡티와 어둠에 쓰이고 있어서입니다. */
+  body.s-포스터::after {
+    content: "";
+    position: fixed;
+    inset: 26px;
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+    pointer-events: none;
+    z-index: 5;
   }
   /* 배경 잡티 */
   .s-포스터 .card::before {
@@ -307,6 +336,10 @@
     max-width: 560px;
     max-height: 100%;
     border-radius: 3px;
+    /* 살짝 돌리고 왼쪽에 밝은 띠를 둬서 '책 두께'를 만듭니다.
+       각도를 더 주면 표지 글씨가 일그러져 읽기 나빠집니다. */
+    transform: perspective(2400px) rotateY(-3deg);
+    border-left: 7px solid #b8b1a4;
     box-shadow:
       0 0 4px color-mix(in srgb, var(--accent) 90%, transparent),
       0 0 46px color-mix(in srgb, var(--accent) 62%, transparent),
@@ -327,10 +360,13 @@
 
   /* 큰 글씨 + 잡티 질감 */
   .s-포스터 .headline {
+    font-family: "포스터체", "Malgun Gothic", "Noto Sans CJK KR", sans-serif;
     font-size: 144px;
-    font-weight: 800;
+    /* 검은고딕은 굵기가 하나뿐입니다. 800 을 주면 크롬이 억지로 굵게 만들어
+       획이 뭉갭니다. 반드시 400 으로 두고 글꼴 자체 굵기를 씁니다. */
+    font-weight: 400;
     line-height: 1.04;
-    letter-spacing: -0.055em;
+    letter-spacing: -0.03em;
     /* 잡티를 옅게 깔아 '닳은 글씨' 느낌만 냅니다. 진하면 지저분해집니다. */
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -0.9 0.42'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23g)'/%3E%3C/svg%3E");
     background-color: var(--ink);
@@ -338,6 +374,13 @@
     background-clip: text;
     -webkit-text-fill-color: transparent;
     text-shadow: none;
+    /* 가로로 길게 늘인 잡음을 덮어 '긁힌 인쇄' 자국을 냅니다.
+       baseFrequency 의 앞뒤 값이 다른 게 핵심입니다(가로 0.014 / 세로 0.3).
+       같게 두면 모래알처럼 보이고, 이렇게 해야 결이 생깁니다.
+       gamma 로 밝은 쪽을 밀어올려 대부분은 불투명하게 두고 어두운 곳만 뚫습니다. */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='600'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.014 0.3' numOctaves='4' seed='11'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 2.6 0 0 0 -0.62'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='gamma' exponent='0.34'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='900' height='600' filter='url(%23s)'/%3E%3C/svg%3E");
+    -webkit-mask-size: 900px 600px;
+    -webkit-mask-repeat: repeat;
   }
   .s-포스터 .headline.m { font-size: 130px; }
   .s-포스터 .headline.s { font-size: 108px; }

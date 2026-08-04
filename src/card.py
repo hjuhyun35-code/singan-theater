@@ -28,6 +28,29 @@ def _safe_name(text: str) -> str:
     return re.sub(r"[^0-9A-Za-z가-힣]+", "_", text).strip("_")[:40] or "book"
 
 
+# 포스터 제목에 쓰는 굵은 한글 글꼴. 저장소에 같이 두어야 CI에서도 똑같이 나옵니다.
+# 검은고딕 (SIL Open Font License 1.1) — 상업적 사용·임베딩 모두 허용.
+DISPLAY_FONT = ROOT / "assets" / "fonts" / "BlackHanSans-Regular.ttf"
+_font_cache: str | None = None
+
+
+def display_font_uri() -> str:
+    """글꼴 파일을 data 주소로 만듭니다.
+
+    set_content 로 HTML을 넣으면 기준 주소가 없어서 상대 경로 글꼴을 못 찾습니다.
+    그래서 파일을 통째로 HTML 안에 심습니다. 파일이 없으면 빈 문자열을 주고,
+    템플릿은 기본 글꼴로 조용히 되돌아갑니다.
+    """
+    global _font_cache
+    if _font_cache is None:
+        try:
+            b64 = base64.b64encode(DISPLAY_FONT.read_bytes()).decode()
+            _font_cache = f"data:font/ttf;base64,{b64}"
+        except OSError:
+            _font_cache = ""
+    return _font_cache
+
+
 def _fetch_one(url: str) -> tuple[str, bytes]:
     resp = requests.get(
         url,
@@ -175,6 +198,7 @@ def render_cards(
                     accent=accent,
                     back_cover=back_cover,
                     style=style,
+                    display_font=display_font_uri(),
                     **slide,
                 )
                 page.set_content(html, wait_until="load")
