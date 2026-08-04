@@ -138,24 +138,30 @@ def summarize(reviews: list[dict]) -> dict:
     n = len(reviews)
     stop = sum(1 for r in reviews if r.get("행동") == "멈춰서 읽음")
     save = sum(1 for r in reviews if r.get("저장"))
+    follow = sum(1 for r in reviews if r.get("팔로우"))
     return {
         "인원": n,
         "멈춤": stop,
         "넘김": n - stop,
         "저장": save,
-        "팔로우": sum(1 for r in reviews if r.get("팔로우")),
-        "진단": _diagnose(n, stop, save),
+        "팔로우": follow,
+        "진단": _diagnose(n, stop, save, follow),
     }
 
 
-def _diagnose(n: int, stop: int, save: int) -> str:
-    """멈춤과 저장을 갈라 보면 어느 쪽이 약한지 드러납니다."""
+def _diagnose(n: int, stop: int, save: int, follow: int) -> str:
+    """어디가 약한지 짚습니다. 후하게 봐주면 쓸모가 없어지므로 기준을 짭니다.
+
+    멈춤 = 첫 장의 힘, 저장 = 내용의 힘, 팔로우 = 계정의 힘.
+    """
     if stop == 0:
         return "아무도 멈추지 않았습니다. 첫 장을 다시 쓰는 게 좋습니다"
     if stop <= n // 3:
         return "대부분 그냥 넘겼습니다. 첫 장이 약합니다"
-    if stop >= n * 2 // 3 and save == 0:
-        return "읽기는 하는데 남길 만큼은 아니라고 봅니다. 마지막 장이 약합니다"
-    if save >= n // 2:
-        return "반응이 좋은 편입니다"
-    return ""
+    if save == 0:
+        return "읽기는 하는데 남길 게 없다고 봅니다. 마지막 장이 약합니다"
+    if save >= n * 3 // 5 and follow >= n // 3:
+        return "반응이 좋습니다"
+    if follow == 0:
+        return "저장은 해도 팔로우까지는 안 갑니다. 이 계정을 계속 볼 이유가 약합니다"
+    return "나쁘지 않지만 특별하지도 않습니다"
