@@ -48,6 +48,38 @@ def check_reachable(urls: list[str]) -> None:
     print(f"  이미지 {len(urls)}장 접근 확인")
 
 
+def publish_slug(slug: str, repo: str, branch: str = "main") -> dict:
+    """초안 하나를 실제로 발행합니다. 텔레그램 버튼에서도 이걸 씁니다.
+
+    이미 발행된 것은 다시 올리지 않습니다(같은 글이 두 번 올라가는 사고 방지).
+    """
+    post_path = POSTS / slug / "post.json"
+    if not post_path.exists():
+        raise RuntimeError(f"{slug} 초안을 찾을 수 없습니다.")
+
+    post = json.loads(post_path.read_text(encoding="utf-8"))
+    if post.get("published"):
+        raise RuntimeError(f"{slug} 는 이미 발행됐습니다 ({post.get('published_at')}).")
+
+    urls = card_urls(post, repo, branch)
+    check_reachable(urls)
+    alts = [c.get("alt", "") for c in post["cards"]]
+    results: dict[str, str] = {}
+
+    if os.environ.get("INSTAGRAM_ACCESS_TOKEN"):
+        results["instagram"] = publisher.post_to_instagram(post["caption"], urls, alts)
+    if os.environ.get("THREADS_ACCESS_TOKEN"):
+        results["threads"] = publisher.post_to_threads(post["threads_text"], urls)
+    if not results:
+        raise RuntimeError("인스타·쓰레드 토큰이 하나도 없습니다.")
+
+    post["published"] = True
+    post["published_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    post["post_ids"] = results
+    post_path.write_text(json.dumps(post, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"title": post["title"], "results": results}
+
+
 def main() -> int:
     slug = (os.environ.get("SLUG") or "").strip()
     confirm = (os.environ.get("CONFIRM") or "").strip()

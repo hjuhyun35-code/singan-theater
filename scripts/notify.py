@@ -30,6 +30,20 @@ def _call(method: str, data: dict, files: dict | None = None) -> dict:
     return payload
 
 
+def buttons(slug: str) -> str:
+    """승인 / 버리기 버튼. 누르면 '버튼 확인' 워크플로가 받아 처리합니다."""
+    return json.dumps(
+        {
+            "inline_keyboard": [
+                [
+                    {"text": "✅ 승인하고 올리기", "callback_data": f"pub:{slug}"},
+                    {"text": "✕ 버리기", "callback_data": f"skip:{slug}"},
+                ]
+            ]
+        }
+    )
+
+
 def send_album(chat_id: str, image_paths: list[Path], caption: str) -> None:
     """카드 이미지를 앨범 한 덩어리로 보냅니다. 최대 10장."""
     media, files = [], {}
@@ -63,13 +77,7 @@ def summary(post: dict, repo: str) -> str:
     if post.get("copy_overlap", 0) >= 22:
         notes.append(f"원문과 {post['copy_overlap']}자 겹침 — 손보는 게 좋습니다")
     lines += ["", " · ".join(notes)]
-    lines += [
-        "",
-        "─" * 20,
-        f"올리려면 슬러그: {post['slug']}",
-        f"https://github.com/{repo}/actions/workflows/publish.yml",
-        "→ Run workflow → slug 입력 → confirm 에 PUBLISH 입력",
-    ]
+    lines += ["", "─" * 20, f"{post['slug']}"]
     return "\n".join(lines)
 
 
@@ -95,10 +103,22 @@ def main() -> int:
         post = json.loads((folder / "post.json").read_text(encoding="utf-8"))
         images = [folder / c["file"] for c in post["cards"]]
         text = summary(post, repo)
+        # 앨범에는 버튼을 못 붙입니다. 카드를 먼저 보내고, 버튼은 그 아래 붙입니다.
         if images:
             send_album(chat_id, images, text)
+            _call(
+                "sendMessage",
+                {
+                    "chat_id": chat_id,
+                    "text": "올릴까요?",
+                    "reply_markup": buttons(slug),
+                },
+            )
         else:
-            _call("sendMessage", {"chat_id": chat_id, "text": text})
+            _call(
+                "sendMessage",
+                {"chat_id": chat_id, "text": text, "reply_markup": buttons(slug)},
+            )
         print(f"보냄: {slug}")
     return 0
 
