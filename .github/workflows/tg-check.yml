@@ -1,0 +1,21 @@
+name: 텔레그램 점검
+
+# 버튼을 눌렀는데 아무 일도 안 일어날 때 원인을 봅니다.
+# 읽기만 하고 아무것도 처리하지 않습니다.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: 확인
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python tools/tg_debug.py
