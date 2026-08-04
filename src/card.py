@@ -12,6 +12,7 @@ import requests
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from playwright.sync_api import sync_playwright
 
+from . import palette
 from .settings import CARD_DIR, ROOT
 
 WIDTH, HEIGHT = 1080, 1350
@@ -27,7 +28,7 @@ def _safe_name(text: str) -> str:
     return re.sub(r"[^0-9A-Za-z가-힣]+", "_", text).strip("_")[:40] or "book"
 
 
-def _fetch_one(url: str) -> str:
+def _fetch_one(url: str) -> tuple[str, bytes]:
     resp = requests.get(
         url,
         timeout=15,
@@ -36,8 +37,11 @@ def _fetch_one(url: str) -> str:
     resp.raise_for_status()
     mime = resp.headers.get("Content-Type", "image/jpeg").split(";")[0]
     if not mime.startswith("image/"):
-        return ""  # 표지가 지워진 경우 알라딘이 오류 페이지를 돌려줍니다
-    return f"data:{mime};base64,{base64.b64encode(resp.content).decode('ascii')}"
+        return "", b""  # 표지가 지워진 경우 알라딘이 오류 페이지를 돌려줍니다
+    return (
+        f"data:{mime};base64,{base64.b64encode(resp.content).decode('ascii')}",
+        resp.content,
+    )
 
 
 def _cover_data_uri(*urls: str) -> str:
@@ -46,18 +50,23 @@ def _cover_data_uri(*urls: str) -> str:
     고화질 주소부터 시도하고, 그 크기가 없는 책이면 원본 주소로 되돌아갑니다.
     (URL을 그대로 쓰지 않고 직접 받는 이유는 알라딘이 외부 참조를 막을 수 있어서입니다.)
     """
+    return _cover_with_bytes(*urls)[0]
+
+
+def _cover_with_bytes(*urls: str) -> tuple[str, bytes]:
+    """카드에 심을 데이터 주소와, 색을 뽑을 원본 바이트를 함께 돌려줍니다."""
     tried: set[str] = set()
     for url in urls:
         if not url or url in tried:
             continue
         tried.add(url)
         try:
-            data = _fetch_one(url)
+            data, raw = _fetch_one(url)
             if data:
-                return data
+                return data, raw
         except requests.RequestException:
             continue
-    return ""
+    return "", b""
 
 
 def build_slides(book: dict, copy: dict, credit: str = "") -> list[dict]:
@@ -105,6 +114,7 @@ def render_cards(
     use_cover: bool = True,
     credit: str = "",
     theme: str = "밤",
+    accent_from_cover: bool = True,
 ) -> list[str]:
     """카드 이미지를 만들고 저장된 파일 경로 목록을 돌려줍니다.
 
@@ -116,11 +126,13 @@ def render_cards(
     if not slides:
         return []
 
-    cover = (
-        _cover_data_uri(book.get("cover_url", ""), book.get("cover_url_fallback", ""))
-        if use_cover
-        else ""
+    # 표지는 카드에 심을 용도와, 강조색을 뽑을 용도로 둘 다 씁니다.
+    cover, raw = _cover_with_bytes(
+        book.get("cover_url", ""), book.get("cover_url_fallback", "")
     )
+    accent = palette.accent_from_cover(raw, theme) if (raw and accent_from_cover) else None
+    if not use_cover:
+        cover = ""  # 표지는 안 넣더라도 색은 가져다 씁니다
     template = _env.get_template("card.html")
     prefix = f"{book['isbn13']}_{_safe_name(book['title'])}"
     paths: list[str] = []
@@ -130,7 +142,9 @@ def render_cards(
         page = browser.new_page(viewport={"width": WIDTH, "height": HEIGHT})
         try:
             for slide in slides:
-                html = template.render(cover_url=cover, theme=theme, **slide)
+                html = template.render(
+                    cover_url=cover, theme=theme, accent=accent, **slide
+                )
                 page.set_content(html, wait_until="load")
                 page.wait_for_timeout(120)  # 폰트가 자리를 잡을 시간
                 out = CARD_DIR / f"{prefix}_{slide['index']}.jpg"

@@ -232,7 +232,8 @@
   .titleblock .byline { font-size: 28px; color: var(--ink-dim); }
 </style>
 </head>
-<body class="t-{{ theme or '밤' }}">
+{# 표지에서 뽑은 색이 있으면 강조색만 그것으로 바꿉니다 #}
+<body class="t-{{ theme or '밤' }}"{% if accent %} style="--accent: {{ accent }}"{% endif %}>
 <div class="card k-{{ kind }} {{ 'cover-slide' if show_cover else '' }} {{ 'outro' if is_outro else '' }}">
 
   {% if show_cover %}

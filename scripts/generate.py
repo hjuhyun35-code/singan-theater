@@ -200,7 +200,12 @@ def main() -> int:
         # 카드 파일 이름은 반드시 영문. 한글 파일명은 이미지 주소에서 깨집니다.
         card.CARD_DIR = out_dir
         paths = card.render_cards(
-            book, copy, config["발행"].get("표지_사용", True), build_credit(book, config)
+            book,
+            copy,
+            config["발행"].get("표지_사용", True),
+            build_credit(book, config),
+            config["발행"].get("색테마", "밤"),
+            config["발행"].get("표지색_강조", True),
         )
 
         post = build_post(book, copy, slug, config)
