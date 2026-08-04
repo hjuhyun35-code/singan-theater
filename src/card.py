@@ -100,6 +100,26 @@ def _plain(text: str) -> str:
     return _EMPH.sub(r"\1", text).strip()
 
 
+# 앞말에 붙어서만 뜻이 사는 낱말들. 줄 첫머리에 혼자 떨어지면 읽기 나쁩니다.
+# '맞부딪칠 / 때 무엇이 남는가' 처럼 끊긴 카드가 실제로 나왔습니다.
+_CLING = (
+    "때", "것", "수", "줄", "리", "뿐", "채", "만큼", "데", "바", "듯",
+    "대로", "뒤", "앞", "후", "중", "적", "번", "말", "터",
+)
+_CLING_RE = re.compile(
+    r"(?<=\S) (?=(?:" + "|".join(_CLING) + r")(?:[은는이가을를의도만에과와로]|였|이었)?[.,?! ]?(?:\s|$))"
+)
+
+
+def _glue(text: str) -> str:
+    """의존명사 앞의 띄어쓰기를 '안 끊기는 빈칸'으로 바꿉니다.
+
+    CSS 는 한국어 구(句)를 모르기 때문에 어절 단위로만 끊습니다.
+    보이는 모양은 그대로고, 줄바꿈만 그 자리에서 일어나지 않습니다.
+    """
+    return _CLING_RE.sub(" ", text)
+
+
 def _split_emphasis(text: str) -> list[dict]:
     """'앞말 *강조* 뒷말' 을 조각으로 나눕니다. 템플릿이 색을 입힙니다."""
     parts: list[dict] = []
@@ -129,12 +149,12 @@ def build_slides(book: dict, copy: dict, credit: str = "") -> list[dict]:
                 "kicker": slide.get("kicker", ""),
                 "headline": _plain(headline),
                 # *별표* 로 감싼 부분은 강조색으로 칠합니다.
-                "headline_parts": _split_emphasis(headline),
+                "headline_parts": _split_emphasis(_glue(headline)),
                 "body": slide.get("body", ""),
                 # 줄바꿈으로 나눈 각 문장. 길어서 자동으로 넘어간 줄과
                 # 일부러 끊은 줄이 헷갈리지 않도록 문단으로 나눠 그립니다.
                 "body_lines": [
-                    line.strip()
+                    _glue(line.strip())
                     for line in (slide.get("body") or "").split("\n")
                     if line.strip()
                 ],

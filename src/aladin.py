@@ -147,6 +147,29 @@ def _parse_date(raw: str) -> date | None:
     return None
 
 
+# 알라딘은 같은 책의 판형·굿즈 상품을 제목 뒤 괄호로 구분합니다.
+# 이건 책 이름이 아니라 상품 이름이라 카드에 그대로 나오면 지저분합니다.
+_EDITION = re.compile(
+    r"\s*[(\[]\s*(?:사인|친필|특별|한정|리커버|개정|양장|무선|스페셜|증보|합본|세트|"
+    r"보급|미니|박스|에디션|초판|기념)[^)\]]*[)\]]\s*$"
+)
+
+
+def _strip_edition(title: str) -> str:
+    """'태양 아래 올리브 (사인인쇄본)' → '태양 아래 올리브'.
+
+    여러 개가 겹쳐 붙는 경우가 있어 더 지울 게 없을 때까지 반복합니다.
+    다 지우면 빈 문자열이 되니, 그때는 원래 제목을 그대로 둡니다.
+    """
+    out = title.strip()
+    while True:
+        trimmed = _EDITION.sub("", out).strip()
+        if trimmed == out:
+            break
+        out = trimmed
+    return out or title.strip()
+
+
 def normalize(raw: dict, detail: dict | None = None) -> dict:
     """알라딘 응답을 우리가 쓰기 좋은 형태로 정리합니다."""
     d = {**raw, **(detail or {})}
@@ -158,10 +181,10 @@ def normalize(raw: dict, detail: dict | None = None) -> dict:
     cover_large = re.sub(r"/cover(sum|\d*)?/", "/cover500/", cover)
     return {
         "isbn13": (d.get("isbn13") or d.get("isbn") or "").strip(),
-        "title": _clean(d.get("title")),
+        "title": _strip_edition(_clean(d.get("title"))),
         # 알라딘 제목에는 부제가 ' - ' 뒤에 붙어 있습니다.
         # 카드와 검색줄에는 짧은 제목만 씁니다.
-        "short_title": _clean(d.get("title")).split(" - ")[0].strip(),
+        "short_title": _strip_edition(_clean(d.get("title")).split(" - ")[0]),
         "subtitle": _clean(d.get("subTitle")),
         "author": _clean(d.get("author")),
         "author_display": primary_author(_clean(d.get("author"))),

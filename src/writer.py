@@ -123,11 +123,21 @@ TOOL = {
                         "headline": {
                             "type": "string",
                             "description": (
-                                "카드의 큰 글씨. 28자 이내. "
-                                "★가장 힘이 실리는 낱말 하나를 *별표*로 감싸라. 그 부분만 색이 칠해진다. "
-                                "예: '오후 2시, 길 건너 집 현관에 *누가* 서 있다'. "
-                                "한 카드에 한 군데만. 두세 글자짜리 낱말이 가장 잘 보인다. "
-                                "문장 전체를 감싸면 효과가 없다."
+                                "카드의 큰 글씨. 28자 이내. 별표 같은 기호는 넣지 마라. "
+                                "★뭉뚱그리지 마라. '~란 무엇인가', '~은 얼마나 ~한가', "
+                                "'~할 때 무엇이 남는가' 같은 논술 제목은 금지다. "
+                                "사람·사물·행동이 들어간 장면을 써라. "
+                                "나쁜 예: '신앙과 과학, 맞부딪칠 때 무엇이 남는가'. "
+                                "좋은 예: '수녀가 유튜버의 카메라 앞에 앉았다'."
+                            ),
+                        },
+                        "emphasis": {
+                            "type": "string",
+                            "description": (
+                                "위 headline 에서 색을 칠할 부분. 그 문장 안에 있는 글자를 "
+                                "그대로 똑같이 옮겨 적어라. 두세 글자짜리 낱말이 가장 잘 보인다. "
+                                "예를 들어 headline 이 '수녀가 유튜버의 카메라 앞에 앉았다' 라면 "
+                                "'수녀가' 또는 '카메라'. 문장 전체를 적으면 효과가 없다."
                             ),
                         },
                         "body": {
@@ -135,7 +145,7 @@ TOOL = {
                             "description": "카드의 본문. 90자 이내. 단 '이야기' 카드는 150자까지 쓸 수 있다. 없으면 빈 문자열.",
                         },
                     },
-                    "required": ["type", "kicker", "headline", "body"],
+                    "required": ["type", "kicker", "headline", "emphasis", "body"],
                 },
             },
             "search_line": {
@@ -340,16 +350,40 @@ def write_copy(book: dict, config: dict) -> dict:
     return result
 
 
+def mark_emphasis(headline: str, emphasis: str) -> str:
+    """모델이 따로 적어준 낱말을 헤드라인 안에서 *별표*로 감쌉니다.
+
+    문장 안에 '*별표*를 직접 쳐라'고 시켰더니 haiku 가 다섯 장 내내 무시했습니다.
+    그래서 낱말을 별도 칸으로 받아 표시는 여기서 붙입니다.
+    모델이 엉뚱한 낱말을 적어 보내면(문장에 없으면) 그냥 강조를 포기합니다.
+    잘못된 자리에 색이 칠해지는 것보다 색이 없는 편이 낫습니다.
+    """
+    head = (headline or "").replace("*", "").strip()
+    word = (emphasis or "").replace("*", "").strip()
+    if not head or not word or word == head:
+        return head
+    at = head.find(word)
+    if at < 0:
+        return head
+    return f"{head[:at]}*{word}*{head[at + len(word):]}"
+
+
 def apply_plan(plan: list[str], slides: list[dict], book: dict) -> list[dict]:
     """카드 종류를 계획대로 덮어쓰고 대체텍스트를 붙입니다.
 
     모델이 시킨 종류를 무시하고 다른 종류로 보내거나, 이어지는 카드에서
     종류를 빈 값으로 보내는 일이 실제로 있었습니다. 계획이 정답입니다.
     """
-    return [
-        {**slide, "type": kind, "alt": _alt_text(slide, book)}
-        for kind, slide in zip(plan, slides)
-    ]
+    out = []
+    for kind, slide in zip(plan, slides):
+        marked = {
+            **slide,
+            "type": kind,
+            "headline": mark_emphasis(slide.get("headline"), slide.get("emphasis")),
+        }
+        # 대체텍스트는 별표가 붙기 전 문장으로 만들어야 깨끗합니다.
+        out.append({**marked, "alt": _alt_text(slide, book)})
+    return out
 
 
 MATERIAL_TOOL = {
