@@ -123,7 +123,7 @@
     }
   ],
   "created_at": "2026-08-05T00:18:49+00:00",
-  "published": false,
+  "published": true,
   "tray": "신간",
   "research_len": 1235,
   "research_sources": [
@@ -135,5 +135,9 @@
     "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=276926308",
     "https://www.gwangjinlib.seoul.kr/gjinfo/newBookDetail.do?bookIdx=769",
     "https://www.todaysbooks.ca/products/%ED%83%9C%EC%96%91-%EC%95%84%EB%9E%98-%EC%98%AC%EB%A6%AC%EB%B8%8C"
-  ]
+  ],
+  "published_at": "2026-08-05T00:26:56+00:00",
+  "post_ids": {
+    "instagram": "17872988049628829"
+  }
 }
