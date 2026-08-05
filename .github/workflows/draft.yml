@@ -9,7 +9,7 @@ on:
         default: ""
   schedule:
     # 매일 아침 8시(한국). 초안만 만들고 발행은 하지 않습니다.
-    - cron: "0 23 * * *"
+    - cron: "47 22 * * *"
 
 permissions:
   contents: write
