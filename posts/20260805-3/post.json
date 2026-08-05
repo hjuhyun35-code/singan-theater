@@ -123,7 +123,7 @@
     }
   ],
   "created_at": "2026-08-05T08:40:36+00:00",
-  "published": false,
+  "published": true,
   "tray": "베스트셀러",
   "research_len": 2306,
   "research_sources": [
@@ -135,5 +135,9 @@
     "https://www.gimmyoung.com/book/books/view/book/4020",
     "https://brunch.co.kr/@gentle-observer/21",
     "https://brunch.co.kr/@mamajin/355"
-  ]
+  ],
+  "published_at": "2026-08-05T08:53:47+00:00",
+  "post_ids": {
+    "instagram": "17951501751232960"
+  }
 }
