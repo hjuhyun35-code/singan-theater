@@ -1,0 +1,107 @@
+name: 텔레그램 명령
+
+# 텔레그램에서 버튼을 누르거나 "초안" 이라고 보내면 Cloudflare Worker 가
+# 이 워크플로를 즉시 깨웁니다. 물어보는 방식(버튼 확인)과 달리 기다림이 없습니다.
+#
+# Worker 코드는 저장소의 worker/ 안에 있습니다.
+# 무엇을 할지는 client_payload.action 에 담겨 옵니다: publish / skip / draft
+
+on:
+  repository_dispatch:
+    types: [telegram]
+
+permissions:
+  contents: write
+
+jobs:
+  # ── 버튼을 누른 경우: 그 한 건만 처리하고 끝. 보통 1분 안에 끝납니다. ──
+  button:
+    if: github.event.client_payload.action != 'draft'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: 버튼 처리
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          TG_ACTION: ${{ github.event.client_payload.action }}
+          TG_SLUG: ${{ github.event.client_payload.slug }}
+          TG_CHAT_ID: ${{ github.event.client_payload.chat_id }}
+          TG_MESSAGE_ID: ${{ github.event.client_payload.message_id }}
+        run: python scripts/tg_action.py
+
+  # ── "초안" 이라고 보낸 경우: 새로 만들어 텔레그램으로 보냅니다. 10~20분. ──
+  draft:
+    if: github.event.client_payload.action == 'draft'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 한글 폰트 설치
+        # 이게 없으면 카드의 한글이 전부 네모(□)로 나옵니다
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-color-emoji
+          fc-cache -f
+
+      - name: 패키지 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: 초안 생성
+        id: gen
+        env:
+          ALADIN_TTB_KEY: ${{ secrets.ALADIN_TTB_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NL_API_KEY: ${{ secrets.NL_API_KEY }}
+        run: python scripts/generate.py
+
+      - name: 결과 커밋
+        if: steps.gen.outputs.count != '0'
+        run: |
+          git config user.name "book-bot"
+          git config user.email "book-bot@users.noreply.github.com"
+          git add posts
+          git diff --staged --quiet || git commit -m "초안 ${{ steps.gen.outputs.slugs }}"
+          # 같은 시각에 다른 것이 올라오면 push 가 거부됩니다. 받아서 얹고 다시 시도합니다.
+          for i in 1 2 3; do
+            if git push; then exit 0; fi
+            echo "push 거부됨 ($i/3). 원격 변경을 받아 다시 시도합니다."
+            git pull --rebase --autostash -q origin main || true
+            sleep 5
+          done
+          git push
+
+      - name: 텔레그램으로 보내기
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SLUGS: ${{ steps.gen.outputs.slugs }}
+        run: python scripts/notify.py
+
+      - name: 카드 미리보기
+        if: steps.gen.outputs.count != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cards
+          path: posts/**/card*.jpg
+          retention-days: 14

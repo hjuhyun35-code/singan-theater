@@ -1,0 +1,63 @@
+name: 텔레그램 연결
+
+# 텔레그램에게 "이제 버튼 눌림을 이 주소로 보내라" 고 알려줍니다.
+# 봇 열쇠가 GitHub Secrets 밖으로 나가지 않게, 이 일은 여기서 합니다.
+#
+# ★ 연결(켜기)을 하면 '버튼 확인'·초안의 '버튼 기다리기' 같은 물어보는 방식은
+#   더 이상 동작하지 않습니다. 텔레그램은 둘 중 하나만 허용합니다.
+#   되돌리려면 하는일 을 끄기 로 두고 한 번 더 돌리세요.
+
+on:
+  workflow_dispatch:
+    inputs:
+      하는일:
+        description: "켜기 / 끄기 / 상태확인"
+        required: true
+        default: "상태확인"
+        type: choice
+        options: ["상태확인", "켜기", "끄기"]
+      주소:
+        description: "켜기 일 때 쓸 Worker 주소 (비우면 아래 기본값)"
+        required: false
+        default: ""
+
+jobs:
+  connect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 텔레그램에 알리기
+        env:
+          T: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          S: ${{ secrets.WEBHOOK_SECRET }}
+          URL: ${{ inputs.주소 }}
+          DO: ${{ inputs.하는일 }}
+        run: |
+          set -e
+          API="https://api.telegram.org/bot$T"
+          if [ "$DO" = "켜기" ]; then
+            [ -n "$URL" ] || URL="https://singan-telegram.garii.workers.dev"
+            echo "연결합니다: $URL"
+            curl -sS -X POST "$API/setWebhook" \
+              -d "url=$URL" \
+              -d "secret_token=$S" \
+              -d 'allowed_updates=["message","callback_query"]' \
+              -d "drop_pending_updates=false" | tee /tmp/r.json
+          elif [ "$DO" = "끄기" ]; then
+            echo "연결을 끊습니다. 다시 물어보는 방식으로 돌아갑니다."
+            curl -sS -X POST "$API/deleteWebhook" | tee /tmp/r.json
+          fi
+          echo ""
+          echo "── 지금 상태 ──"
+          # 열쇠가 로그에 찍히지 않도록 url 만 잘라서 보여줍니다.
+          curl -sS "$API/getWebhookInfo" | tee /tmp/i.json
+          echo ""
+          python3 - <<'PY'
+          import json
+          d = json.load(open("/tmp/i.json")).get("result", {})
+          print("연결 주소      :", d.get("url") or "(없음 — 물어보는 방식)")
+          print("밀린 눌림      :", d.get("pending_update_count", 0), "건")
+          if d.get("last_error_message"):
+              print("최근 오류      :", d["last_error_message"])
+              print("  → Worker 가 아직 안 떴거나 비밀값이 안 맞습니다.")
+          PY

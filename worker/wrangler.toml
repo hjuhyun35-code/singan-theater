@@ -1,0 +1,11 @@
+name = "singan-telegram"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# 텔레그램이 버튼 눌림·메시지를 이리로 즉시 보냅니다.
+# 이 파일에는 비밀값을 적지 않습니다. 아래 셋은 wrangler secret 으로 따로 넣습니다.
+#   WEBHOOK_SECRET   텔레그램이 보낸 게 맞는지 확인하는 암호
+#   GITHUB_TOKEN     GitHub 워크플로를 깨우는 열쇠
+#   TELEGRAM_TOKEN   "접수했습니다" 라고 즉시 답하기 위한 봇 열쇠
+[vars]
+GITHUB_REPO = "hjuhyun35-code/singan-theater"
