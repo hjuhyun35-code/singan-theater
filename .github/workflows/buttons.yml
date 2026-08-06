@@ -2,25 +2,38 @@ name: 버튼 확인
 
 # 텔레그램에서 누른 '승인하고 올리기' 를 처리합니다.
 #
-# 초안이 만들어진 직후 30분은 자동으로 지켜보고 있습니다.
-# 그 시간이 지나서 누르셨다면 이걸 한 번 돌리세요.
+# 초안 워크플로는 만든 직후 5시간 반만 지켜봅니다. 그 뒤에 누른 것은
+# 아무도 받아가지 않아 조용히 묻힙니다 (2026-08-05 실제로 한 건 놓쳤습니다).
+# 그래서 이걸 한 시간에 한 번씩 돌려 밀린 눌림을 받아갑니다.
+#
+# 텔레그램은 누른 버튼을 24시간 동안 들고 있습니다. 받아가기만 하면
+# 새벽에 누르셔도 살아납니다. 매번 3분만 물어보고 끝내므로 오래 돌지 않습니다.
 
 on:
+  schedule:
+    # 매시 23분. 정각은 전 세계가 몰려 밀리므로 일부러 비켰습니다.
+    # 시간대(UTC 05~22시 = 한국 오후 2시 ~ 다음날 아침 7시)를 제한한 이유:
+    # 초안 워크플로가 한국 아침 7시 47분부터 5시간 반을 지켜보고 있어,
+    # 그 시간에 이게 끼어들면 줄줄이 취소돼 실행 화면이 지저분해집니다.
+    # 그 시간대는 초안 쪽 감시자가 버튼을 받아주므로 비워도 구멍이 안 납니다.
+    - cron: "23 5-22 * * *"
   workflow_dispatch:
     inputs:
       minutes:
-        description: "몇 분 동안 지켜볼지 (기본 10)"
+        description: "몇 분 동안 지켜볼지 (비우면 3)"
         required: false
         default: "10"
 
 permissions:
   contents: write
 
-# 초안 워크플로의 감시자와 겹치지 않게 합니다. 이걸 돌리면 그쪽 감시는 멈추고
-# 밀려 있던 버튼 눌림을 이쪽이 받아 처리합니다.
+# 감시자가 둘 이상 돌면 서로 버튼 눌림을 가져가 버립니다.
+# ★ cancel-in-progress 를 false 로 둡니다. 한 시간마다 도는 이 워크플로가
+#   초안 워크플로의 감시를 끊어버리면 안 되기 때문입니다. 그쪽이 돌고 있으면
+#   이건 얌전히 기다렸다가 끝난 뒤에 돕니다. (그 사이 눌림은 그쪽이 처리합니다)
 concurrency:
   group: telegram-watch
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   watch:
@@ -44,5 +57,7 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
-          WATCH_MINUTES: ${{ inputs.minutes }}
+          # 예약 실행에는 입력값이 없습니다. 그때는 3분만 물어보고 끝냅니다.
+          # 밀린 눌림은 물어보는 즉시 한꺼번에 옵니다. 오래 기다릴 필요가 없습니다.
+          WATCH_MINUTES: ${{ inputs.minutes || '3' }}
         run: python scripts/watch_buttons.py
