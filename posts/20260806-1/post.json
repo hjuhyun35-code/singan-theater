@@ -123,7 +123,7 @@
     }
   ],
   "created_at": "2026-08-06T08:09:39+00:00",
-  "published": false,
+  "published": true,
   "tray": "베스트셀러",
   "research_len": 2500,
   "research_sources": [
@@ -135,5 +135,9 @@
     "https://www.goodreads.com/notes/199415360-somewhere-beyond-the-sea/186225518-meg-x1f319-x1f9f8-x1f33b-eldest-daughter/9cd9c432-6f7f-43db-93f0-bf7142338640",
     "https://www.goodreads.com/notes/217203110-my-friends/131988497-kylee-paradowski/ff7434fe-604f-4940-b932-f748432d60cc",
     "https://www.goodreads.com/notes/54848594-everything-sad-is-untrue/47990158-jennifer-flummerfelt/a38472a2-9bf8-4be2-9600-23ff5890af2a"
-  ]
+  ],
+  "published_at": "2026-08-06T09:07:25+00:00",
+  "post_ids": {
+    "instagram": "17981755311110503"
+  }
 }
