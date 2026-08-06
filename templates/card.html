@@ -374,10 +374,19 @@
     background-clip: text;
     -webkit-text-fill-color: transparent;
     text-shadow: none;
-    /* 가로로 길게 늘인 잡음을 덮어 '긁힌 인쇄' 자국을 냅니다.
-       baseFrequency 의 앞뒤 값이 다른 게 핵심입니다(가로 0.014 / 세로 0.3).
-       같게 두면 모래알처럼 보이고, 이렇게 해야 결이 생깁니다.
-       gamma 로 밝은 쪽을 밀어올려 대부분은 불투명하게 두고 어두운 곳만 뚫습니다. */
+  }
+
+  /* ── 글자를 가로줄로 긁는 효과 ──────────────────────────────
+     ★ 기본은 꺼져 있습니다. config.json 의 발행.글자_긁힘 을 true 로 해야 켜집니다.
+       2026-08-06: 늘 켜져 있던 것을 껐습니다. 글자마다 가로 줄무늬가 생겨
+       읽기 나쁘고 지저분하다는 지적을 받았습니다. 공포·스릴러처럼 낡고
+       불안한 느낌을 일부러 낼 책에만 켜세요.
+
+     원리: 가로로 길게 늘인 잡음을 글자 위에 덮어 '긁힌 인쇄' 자국을 냅니다.
+     baseFrequency 의 앞뒤 값이 다른 게 핵심입니다(가로 0.014 / 세로 0.3).
+     같게 두면 모래알처럼 보이고, 이렇게 해야 결이 생깁니다.
+     gamma 로 밝은 쪽을 밀어올려 대부분은 불투명하게 두고 어두운 곳만 뚫습니다. */
+  .s-포스터.긁힘 .headline {
     -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='600'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.014 0.3' numOctaves='4' seed='11'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 2.6 0 0 0 -0.62'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='gamma' exponent='0.34'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='900' height='600' filter='url(%23s)'/%3E%3C/svg%3E");
     -webkit-mask-size: 900px 600px;
     -webkit-mask-repeat: repeat;
@@ -417,7 +426,7 @@
 </style>
 </head>
 {# 표지에서 뽑은 색이 있으면 강조색만 그것으로 바꿉니다 #}
-<body class="t-{{ theme or '밤' }} s-{{ style or '기본' }}"{% if accent %} style="--accent: {{ accent }}"{% endif %}>
+<body class="t-{{ theme or '밤' }} s-{{ style or '기본' }}{% if scratch %} 긁힘{% endif %}"{% if accent %} style="--accent: {{ accent }}"{% endif %}>
 <div class="card k-{{ kind }} {{ 'cover-slide' if show_cover else '' }} {{ 'outro' if is_outro else '' }}">
 
 {# 첫 장이 아닌 카드에서 표지를 어떻게 쓸지 #}

@@ -185,6 +185,9 @@ def render_cards(
     accent_from_cover: bool = True,
     back_cover: str = "없음",
     style: str = "기본",
+    # 글자에 가로 줄무늬(긁힌 인쇄)를 입힐지. 기본은 꺼짐 — 읽기 나쁘고 지저분합니다.
+    # 공포·스릴러처럼 일부러 낡은 느낌을 낼 때만 켜세요. (포스터 스타일에서만 먹습니다)
+    scratch: bool = False,
 ) -> list[str]:
     """카드 이미지를 만들고 저장된 파일 경로 목록을 돌려줍니다.
 
@@ -218,6 +221,7 @@ def render_cards(
                     accent=accent,
                     back_cover=back_cover,
                     style=style,
+                    scratch=scratch,
                     display_font=display_font_uri(),
                     **slide,
                 )
