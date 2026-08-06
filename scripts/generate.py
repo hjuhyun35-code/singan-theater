@@ -281,7 +281,7 @@ def run_tray(tray: dict, seen: dict, config: dict, made: list[str]) -> None:
             config["발행"].get("표지색_강조", True),
             config["발행"].get("뒷장_표지", "없음"),
             config["발행"].get("카드_스타일", "기본"),
-            config["발행"].get("글자_긁힘", False),
+            config["발행"].get("낡은_질감", False),
         )
 
         post = build_post(book, copy, slug, config)

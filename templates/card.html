@@ -282,8 +282,18 @@
 
   .s-포스터 .card {
     padding: 62px 64px 58px;
-    /* 맨 위 = 콘크리트 얼룩, 그 아래 = 오른쪽 위 색 번짐, 맨 아래 = 바탕색.
-       얼룩은 overlay 로 섞어야 밝은 테마에서도 배경을 까맣게 덮지 않습니다. */
+    /* 2026-08-06: 맨 위에 깔던 '콘크리트 얼룩'을 뺐습니다. 갈라진 벽처럼 보인다는
+       지적을 받았습니다. 지금은 색 번짐과 바탕색만 남은 매끈한 배경입니다.
+       얼룩이 필요하면 발행.낡은_질감 을 켜세요(아래 .긁힘 규칙에서 되살립니다). */
+    background-image:
+      radial-gradient(70% 55% at 88% 22%,
+        color-mix(in srgb, var(--accent) 26%, transparent) 0%, transparent 70%),
+      radial-gradient(120% 80% at 50% 8%,
+        color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 55%),
+      radial-gradient(140% 100% at 50% 50%, var(--bg-a) 0%, var(--bg-b) 70%);
+  }
+  /* 낡은 느낌을 되살릴 때만 얼룩을 다시 깝니다. */
+  .s-포스터.긁힘 .card {
     background-image:
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1080' height='1350'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.009' numOctaves='5' seed='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='1080' height='1350' filter='url(%23b)'/%3E%3C/svg%3E"),
       radial-gradient(70% 55% at 88% 22%,
@@ -303,8 +313,9 @@
     pointer-events: none;
     z-index: 5;
   }
-  /* 배경 잡티 */
-  .s-포스터 .card::before {
+  /* 배경 잡티(모래알). 2026-08-06 기본으로 껐습니다 — 확대하면 지저분합니다.
+     발행.낡은_질감 을 켤 때만 나옵니다. */
+  .s-포스터.긁힘 .card::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -361,7 +372,7 @@
   /* 큰 글씨. 기본은 아무 질감 없는 매끈한 단색입니다.
      2026-08-06: 글자에 옅게 깔던 잡티를 걷어냈습니다. 크게 뽑으니 갈라진
      자국처럼 보여 "그냥 텍스트만 써" 라는 지적을 받았습니다.
-     낡은 느낌이 필요하면 config.json 의 발행.글자_긁힘 을 켜세요. */
+     낡은 느낌이 필요하면 config.json 의 발행.낡은_질감 을 켜세요. */
   .s-포스터 .headline {
     font-family: "포스터체", "Malgun Gothic", "Noto Sans CJK KR", sans-serif;
     font-size: 144px;
@@ -375,7 +386,7 @@
   }
 
   /* ── 글자를 가로줄로 긁는 효과 ──────────────────────────────
-     ★ 기본은 꺼져 있습니다. config.json 의 발행.글자_긁힘 을 true 로 해야 켜집니다.
+     ★ 기본은 꺼져 있습니다. config.json 의 발행.낡은_질감 을 true 로 해야 켜집니다.
        2026-08-06: 늘 켜져 있던 것을 껐습니다. 글자마다 가로 줄무늬가 생겨
        읽기 나쁘고 지저분하다는 지적을 받았습니다. 공포·스릴러처럼 낡고
        불안한 느낌을 일부러 낼 책에만 켜세요.
