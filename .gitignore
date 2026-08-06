@@ -3,3 +3,7 @@
 out/
 __pycache__/
 *.pyc
+
+# wrangler 가 만드는 캐시. 계정 번호가 들어 있어 공개 저장소에 올리면 안 됩니다.
+worker/.wrangler/
+worker/node_modules/
