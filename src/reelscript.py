@@ -37,10 +37,11 @@ SYSTEM = """너는 인스타 릴스 대본을 쓰는 작가다.
 - 마지막은 반드시 할 일을 정확히 말하고 닫아라. 여운으로 흐리지 마라.
 
 ★ 길이가 가장 중요하다. 읽으면 소리가 되고, 길면 사람들이 끝까지 안 본다.
-- 훅 대사는 한 문장, 25자 이내.
-- 포인트 대사는 한 문장, 45자 이내. 두 문장으로 나누지 마라.
-- 맺음 대사는 한 문장, 30자 이내.
-- 전부 합쳐 읽었을 때 25초를 넘기면 안 된다. 넘칠 것 같으면 설명을 버려라.
+  한국어는 1초에 네 글자쯤 읽힌다. 30자면 벌써 8초다.
+- 훅 대사는 한 문장, 24자 이내.
+- 포인트 대사는 한 문장, 30자 이내. 두 문장으로 나누지 마라.
+- 맺음 대사는 한 문장, 24자 이내.
+- 전부 합쳐 30초를 넘기면 안 된다. 넘칠 것 같으면 설명을 버려라.
   덜 설명하고 궁금하게 두는 편이 낫다."""
 
 # ★ 항목 이름은 반드시 영문이어야 합니다.
@@ -52,8 +53,16 @@ _BEAT = {
     "properties": {
         "sub": {"type": "string", "description": "자막. 화면에 크게 뜨는 짧은 글."},
         "say": {"type": "string", "description": "대사. 읽어줄 말. 말하듯 자연스럽게."},
+        "hot": {
+            "type": "string",
+            "description": (
+                "자막 안에서 색을 다르게 줄 낱말 한두 개. "
+                "반드시 자막에 있는 그대로 적어야 한다(띄어쓰기 포함). "
+                "자막의 절반을 넘기지 마라. 강조가 다 되면 강조가 아니다."
+            ),
+        },
     },
-    "required": ["sub", "say"],
+    "required": ["sub", "say", "hot"],
 }
 
 TOOL = {
@@ -68,9 +77,9 @@ TOOL = {
             },
             "points": {
                 "type": "array",
-                "minItems": 3,
-                "maxItems": 3,
-                "description": "이 책이 무엇을 말하는지 셋으로 나눈다. 자막 14자, 대사 40자 안팎.",
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "이 책이 무엇을 말하는지 둘로 나눈다. 자막 14자, 대사 30자 안팎.",
                 "items": _BEAT,
             },
             "closing": {
@@ -95,22 +104,40 @@ TOOL = {
 
 
 def _cap(text: str, limit: int) -> str:
-    """길면 문장 단위로 잘라냅니다. 말 도중에 끊기면 듣기 흉합니다."""
+    """길면 잘라냅니다. 말 도중에 끊기면 듣기 흉하므로 문장 → 쉼표 → 낱말 순으로 끊습니다.
+
+    처음에는 문장 단위로만 잘랐는데, 모델이 한 문장으로 길게 써 보내면
+    자를 곳이 없어 그대로 통과했습니다. 그래서 50자로 막아둔 것이 실제로는
+    안 막혔습니다. 아래로 갈수록 거친 방법이지만 반드시 한도 안에 들어옵니다.
+    """
     import re
 
     text = (text or "").strip()
     if len(text) <= limit:
         return text
+
+    # 1) 문장 단위
     parts = re.split(r"(?<=[.!?])\s+", text)
-    out = ""
-    for p in parts:
-        if not out:
-            out = p
-        elif len(out) + 1 + len(p) <= limit:
-            out = f"{out} {p}"
-        else:
-            break
-    return out
+    if len(parts) > 1:
+        out = ""
+        for p in parts:
+            nxt = p if not out else f"{out} {p}"
+            if len(nxt) > limit and out:
+                break
+            out = nxt
+        if len(out) <= limit:
+            return out
+
+    # 2) 쉼표 단위
+    head = text[: limit + 1]
+    comma = max(head.rfind(", "), head.rfind("? "), head.rfind("… "))
+    if comma > limit * 0.5:
+        return text[:comma].rstrip(" ,")
+
+    # 3) 낱말 단위. 말이 끊긴 티가 덜 나게 마침표를 붙입니다.
+    space = head.rfind(" ")
+    cut = text[:space] if space > limit * 0.5 else text[:limit]
+    return cut.rstrip(" ,") + "."
 
 
 def _material(post: dict) -> str:
@@ -156,17 +183,18 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
 
     # 길이는 부탁만으로는 안 지켜집니다. 실제로 45자짜리를 부탁했는데 14초짜리
     # 문장이 온 적이 있습니다. 넘치면 문장 단위로 잘라냅니다.
-    got["hook"]["say"] = _cap(got["hook"]["say"], 30)
+    got["hook"]["say"] = _cap(got["hook"]["say"], 26)
     for p in got["points"]:
-        p["say"] = _cap(p["say"], 50)
-    got["closing"]["say"] = _cap(got["closing"]["say"], 35)
+        p["say"] = _cap(p["say"], 32)
+    got["closing"]["say"] = _cap(got["closing"]["say"], 26)
 
     scenes = [
         {
             "kind": "훅",
             "kicker": "",
             "headline": got["hook"]["sub"],
-            "emphasis": "",
+            # 강조 낱말만 다른 색으로. 카드와 같은 방식입니다.
+            "emphasis": got["hook"].get("hot", ""),
             "body": got["hook"]["say"],
             "say": got["hook"]["say"],
         }
@@ -177,7 +205,7 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
                 "kind": "포인트",
                 "kicker": f"0{i}",
                 "headline": p["sub"],
-                "emphasis": "",
+                "emphasis": p.get("hot", ""),
                 "body": p["say"],
                 "say": p["say"],
             }
@@ -190,7 +218,7 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
             "kind": "표지",
             "kicker": "",
             "headline": got["closing"]["sub"],
-            "emphasis": "",
+            "emphasis": got["closing"].get("hot", ""),
             "body": f"{title} · {post.get('author','')}",
             "outro_line": closing,
             "say": f"{got['closing']['say']} {title}, {post.get('author','')}. {closing}",
