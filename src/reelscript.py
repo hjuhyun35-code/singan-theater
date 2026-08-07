@@ -77,7 +77,6 @@ TOOL = {
                 },
                 "required": ["자막", "대사"],
             },
-        },
             "캡션": {
                 "type": "string",
                 "description": (
