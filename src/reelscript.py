@@ -40,6 +40,16 @@ SYSTEM = """너는 인스타 릴스 대본을 쓰는 작가다.
 - 과장 광고 표현(인생책, 필독, 충격, 소름)을 쓰지 마라.
 - 마지막은 반드시 할 일을 정확히 말하고 닫아라. 여운으로 흐리지 마라.
 
+★ 대사는 소리가 되어 나간다. 문체가 흔들리면 딴 사람이 읽는 것처럼 들린다.
+- 문체는 '~다' 로 통일하라. 한 영상 안에서 절대 섞지 마라.
+  나쁜 예: "운명이 바뀌었어. 하지만 진보가 아니었어. 함정이었다."
+  좋은 예: "운명이 바뀌었다. 하지만 진보가 아니었다. 함정이었다."
+- '~어', '~야', '~지', '~거든', '알아?' 같은 반말투를 쓰지 마라.
+- 모든 대사는 서술어로 끝내라. 명사나 조사로 끝내지 마라.
+  나쁜 예: "휴대폰 앱의 돈, 법으로 지은 집, 공유하는 종교와 이념."
+  좋은 예: "앱 속의 돈도 법으로 지은 집도 우리가 함께 믿기로 한 것이다."
+- 자막(sub)은 명사로 끝나도 된다. 이 규칙은 대사(say)에만 해당한다.
+
 ★ 길이가 가장 중요하다. 읽으면 소리가 되고, 길면 사람들이 끝까지 안 본다.
   한국어는 1초에 네 글자쯤 읽힌다. 30자면 벌써 8초다.
 - 훅 대사는 한 문장, 24자 이내.
@@ -146,6 +156,27 @@ def _cap(text: str, limit: int) -> str:
     return text
 
 
+def _lint(got: dict) -> list[str]:
+    """대사가 문체 규칙을 지켰는지 봅니다. 안 지키면 한 번 더 시킵니다.
+
+    부탁만으로는 안 지켜집니다. 실제로 '바뀌었어 … 함정이었다' 처럼 반말과
+    ~다 체를 한 문장에 섞고, '종교와 이념.' 처럼 서술어 없이 끝냈습니다.
+    """
+    import re
+
+    says = [got["hook"]["say"], *[p["say"] for p in got["points"]], got["closing"]["say"]]
+    problems = []
+    for s in says:
+        t = (s or "").strip()
+        # 서술어로 끝나는가. 명사로 끝나면 말이 덜 끝난 느낌이 납니다.
+        if not re.search(r"(다|까|요|군|네|랴|자)[.!?…]*$", t):
+            problems.append(f"서술어로 안 끝남: {t[-18:]!r}")
+        # 반말투가 섞였는가.
+        if re.search(r"(었어|았어|해야지|거든|잖아|알아\?|이야|야\?)[.!?…]*(\s|$)", t):
+            problems.append(f"반말투가 섞임: {t[-18:]!r}")
+    return problems
+
+
 def _material(post: dict) -> str:
     slides = "\n".join(
         f"  - [{s.get('type','')}] {s.get('headline','')} / {s.get('body','')}"
@@ -169,23 +200,37 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
     prompt = (
         f"{_material(post)}\n"
         f"말투 지침: {tone}\n\n"
-        "이 책으로 30~40초 릴스 대본을 써라.\n"
-        "훅 하나, 포인트 셋, 맺음 하나.\n"
+        "이 책으로 30초쯤 되는 릴스 대본을 써라.\n"
+        f"훅 하나, 포인트 {POINTS}개, 맺음 하나.\n"
         f"맺음 대사 끝에는 '{closing}' 이 자연스럽게 이어지도록 써라. "
         "그 문구 자체를 대사에 넣지는 마라. 뒤에 따로 붙는다."
     )
 
-    message = client.messages.create(
-        model=config["모델"]["이름"],
-        max_tokens=1500,
-        system=SYSTEM,
-        tools=[TOOL],
-        tool_choice={"type": "tool", "name": "write_reel"},
-        messages=[{"role": "user", "content": prompt}],
-    )
-    got = next((b.input for b in message.content if b.type == "tool_use"), None)
-    if not got:
-        raise RuntimeError("릴스 대본을 만들지 못했습니다.")
+    got, warn = None, ""
+    for attempt in range(2):
+        message = client.messages.create(
+            model=config["모델"]["이름"],
+            max_tokens=1500,
+            system=SYSTEM,
+            tools=[TOOL],
+            tool_choice={"type": "tool", "name": "write_reel"},
+            messages=[{"role": "user", "content": prompt + warn}],
+        )
+        got = next((b.input for b in message.content if b.type == "tool_use"), None)
+        if not got:
+            raise RuntimeError("릴스 대본을 만들지 못했습니다.")
+
+        problems = _lint(got)
+        if not problems or attempt == 1:
+            if problems:
+                print("  ! 문체가 아직 어색합니다:", "; ".join(problems[:3]))
+            break
+        print("  문체를 고쳐 다시 씁니다:", "; ".join(problems[:3]))
+        warn = (
+            "\n\n앞서 쓴 대사에 이런 문제가 있었다. 고쳐서 다시 써라:\n- "
+            + "\n- ".join(problems)
+            + "\n모든 대사를 '~다' 로 끝내고, 반말투를 쓰지 마라."
+        )
 
     # 길이는 부탁만으로는 안 지켜집니다. 실제로 45자짜리를 부탁했는데 14초짜리
     # 문장이 온 적이 있습니다. 넘치면 문장 단위로 잘라냅니다.
