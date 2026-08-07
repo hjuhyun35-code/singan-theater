@@ -66,13 +66,14 @@ def mark_done(slug: str) -> None:
     f.write_text(json.dumps(p, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def send(video: Path, post: dict) -> None:
+def send(video: Path, post: dict, caption: str) -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
     chat = os.environ.get("TELEGRAM_CHAT_ID", "")
     if not token or not chat:
         print("텔레그램 열쇠가 없어 보내지 않습니다. 파일만 남깁니다.")
         return
-    caption = (
+
+    note = (
         f"🎬 {post.get('short_title') or post.get('title','')}\n"
         f"{post.get('author','')}\n\n"
         "음악 없이 읽는 소리만 들어 있습니다.\n"
@@ -81,13 +82,23 @@ def send(video: Path, post: dict) -> None:
     with video.open("rb") as f:
         r = requests.post(
             API.format(token=token, method="sendVideo"),
-            data={"chat_id": chat, "caption": caption, "supports_streaming": True},
+            data={"chat_id": chat, "caption": note, "supports_streaming": True},
             files={"video": (video.name, f, "video/mp4")},
             timeout=300,
         )
     if r.status_code != 200 or not r.json().get("ok"):
         raise RuntimeError(f"텔레그램 전송 실패: {r.text[:300]}")
     print("텔레그램으로 보냈습니다.")
+
+    # 캡션은 따로 보냅니다. 영상 설명에 붙이면 길이 제한에 걸리고,
+    # 무엇보다 통째로 복사하기가 불편합니다.
+    if caption:
+        requests.post(
+            API.format(token=token, method="sendMessage"),
+            data={"chat_id": chat, "text": caption, "disable_web_page_preview": True},
+            timeout=60,
+        )
+        print("캡션도 보냈습니다.")
 
 
 def main() -> int:
@@ -103,8 +114,8 @@ def main() -> int:
     print(f"릴스를 만듭니다: {slug} — {post.get('short_title') or post.get('title','')}")
 
     out = POSTS / slug / "reel.mp4"
-    reel.make_reel(post, config, out)
-    send(out, post)
+    made = reel.make_reel(post, config, out)
+    send(out, post, made.get("caption", ""))
     mark_done(slug)
 
     # 영상은 저장소에 넣지 않습니다. 매일 쌓이면 저장소가 금방 무거워집니다.

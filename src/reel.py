@@ -57,7 +57,29 @@ def _first_sentences(text: str, n: int) -> str:
 
 
 def build_script(post: dict, config: dict) -> list[dict]:
-    """장면 목록을 만듭니다. 각 장면에는 화면에 띄울 글과 읽어줄 말이 들어갑니다.
+    """장면 목록을 만듭니다.
+
+    기본은 릴스 전용 대본입니다. 카드 문구를 그대로 읽으면 '여운' 으로 끝나
+    흐지부지합니다. 릴스는 훅 → 핵심 3포인트 → CTA 로 닫아야 끝까지 봅니다.
+    대본 쓰는 값은 아주 적습니다(하이쿠 한 번, 웹 검색 없음).
+
+    대본 만들기가 실패하면 예전 방식(카드 문구 그대로)으로 물러섭니다.
+    영상이 아예 안 나오는 것보다 낫습니다.
+    """
+    if config.get("영상", {}).get("전용대본", True):
+        try:
+            from . import reelscript
+
+            scenes, caption = reelscript.write_script(post, config)
+            return scenes, caption
+        except Exception as exc:
+            print(f"  ! 릴스 대본 실패, 카드 문구로 만듭니다: {exc}")
+    # 물러섰을 때는 초안이 이미 갖고 있는 캡션을 그대로 씁니다.
+    return build_script_from_cards(post, config), post.get("caption", "")
+
+
+def build_script_from_cards(post: dict, config: dict) -> list[dict]:
+    """카드뉴스 문구를 그대로 읽는 예전 방식. 대본 만들기가 실패했을 때만 씁니다.
 
     전부 읽으면 90초가 넘어 릴스로 너무 깁니다. 그래서 자리마다 읽는 양을 다르게 둡니다.
       훅·여운 = 제목 + 본문 앞 두 문장   (시작과 끝은 붙잡아야 합니다)
@@ -299,8 +321,11 @@ def mux(frames_dir: Path, audio: Path, out: Path) -> Path:
     return out
 
 
-def make_reel(post: dict, config: dict, out_path: Path) -> Path:
-    """초안 하나로 릴스 영상 한 편을 만듭니다."""
+def make_reel(post: dict, config: dict, out_path: Path) -> dict:
+    """초안 하나로 릴스 영상 한 편을 만듭니다.
+
+    돌려주는 것: {"path": 영상 파일, "caption": 인스타에 붙여넣을 글}
+    """
     설정 = config.get("영상", {})
     voice = 설정.get("목소리", "ko-KR-SunHiNeural")
     rate = 설정.get("말속도", "+6%")
@@ -312,7 +337,7 @@ def make_reel(post: dict, config: dict, out_path: Path) -> Path:
         "표지": float(설정.get("끝여운", 2.4)),
     }
 
-    scenes = build_script(post, config)
+    scenes, caption = build_script(post, config)
     work = Path(tempfile.mkdtemp(prefix="reel-"))
     try:
         print(f"  목소리 {voice} · 속도 {rate} · 쉼 {gap}초 · 끝여운 {tails['여운']}초")
@@ -328,6 +353,6 @@ def make_reel(post: dict, config: dict, out_path: Path) -> Path:
         audio = build_audio(plan, work, gap)
         mux(work / "frames", audio, out_path)
         print(f"  영상 완성: {out_path.name} ({out_path.stat().st_size/1e6:.1f}MB)")
-        return out_path
+        return {"path": out_path, "caption": caption}
     finally:
         shutil.rmtree(work, ignore_errors=True)
