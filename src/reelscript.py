@@ -34,7 +34,14 @@ SYSTEM = """너는 인스타 릴스 대본을 쓰는 작가다.
 - 자막은 짧게. 한 줄에 들어가야 한다. 문장부호로 끝맺지 않아도 된다.
 - 대사는 말하듯 자연스럽게. 글 읽는 투('~에 대하여', '~라는 점에서')를 쓰지 마라.
 - 과장 광고 표현(인생책, 필독, 충격, 소름)을 쓰지 마라.
-- 마지막은 반드시 할 일을 정확히 말하고 닫아라. 여운으로 흐리지 마라."""
+- 마지막은 반드시 할 일을 정확히 말하고 닫아라. 여운으로 흐리지 마라.
+
+★ 길이가 가장 중요하다. 읽으면 소리가 되고, 길면 사람들이 끝까지 안 본다.
+- 훅 대사는 한 문장, 25자 이내.
+- 포인트 대사는 한 문장, 45자 이내. 두 문장으로 나누지 마라.
+- 맺음 대사는 한 문장, 30자 이내.
+- 전부 합쳐 읽었을 때 25초를 넘기면 안 된다. 넘칠 것 같으면 설명을 버려라.
+  덜 설명하고 궁금하게 두는 편이 낫다."""
 
 # ★ 항목 이름은 반드시 영문이어야 합니다.
 #   Claude 도구 정의는 '^[a-zA-Z0-9_.-]{1,64}$' 만 받습니다.
@@ -87,6 +94,25 @@ TOOL = {
 }
 
 
+def _cap(text: str, limit: int) -> str:
+    """길면 문장 단위로 잘라냅니다. 말 도중에 끊기면 듣기 흉합니다."""
+    import re
+
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    parts = re.split(r"(?<=[.!?])\s+", text)
+    out = ""
+    for p in parts:
+        if not out:
+            out = p
+        elif len(out) + 1 + len(p) <= limit:
+            out = f"{out} {p}"
+        else:
+            break
+    return out
+
+
 def _material(post: dict) -> str:
     slides = "\n".join(
         f"  - [{s.get('type','')}] {s.get('headline','')} / {s.get('body','')}"
@@ -127,6 +153,13 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
     got = next((b.input for b in message.content if b.type == "tool_use"), None)
     if not got:
         raise RuntimeError("릴스 대본을 만들지 못했습니다.")
+
+    # 길이는 부탁만으로는 안 지켜집니다. 실제로 45자짜리를 부탁했는데 14초짜리
+    # 문장이 온 적이 있습니다. 넘치면 문장 단위로 잘라냅니다.
+    got["hook"]["say"] = _cap(got["hook"]["say"], 30)
+    for p in got["points"]:
+        p["say"] = _cap(p["say"], 50)
+    got["closing"]["say"] = _cap(got["closing"]["say"], 35)
 
     scenes = [
         {

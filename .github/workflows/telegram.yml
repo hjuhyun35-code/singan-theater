@@ -52,6 +52,12 @@ jobs:
     if: github.event.client_payload.action == 'reel'
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    # 두 건이 동시에 돌면 같은 post.json 을 고치다 rebase 가 충돌하고,
+    # 저장소가 detached HEAD 로 빠져 push 가 죽습니다 (2026-08-07 실제로 겪음).
+    # 취소하지 않고 줄 세웁니다. 영상은 둘 다 나와야 합니다.
+    concurrency:
+      group: reel
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -95,12 +101,17 @@ jobs:
           git diff --staged --quiet && exit 0
           git commit -m "릴스 만듦"
           for i in 1 2 3; do
-            if git push; then exit 0; fi
+            if git push origin HEAD:main; then exit 0; fi
             echo "push 거부됨 ($i/3). 원격 변경을 받아 다시 시도합니다."
+            # 앞선 시도가 충돌로 멈춰 있으면 먼저 걷어냅니다.
+            # 안 그러면 rebase 중간 상태(detached HEAD)에 갇혀 계속 실패합니다.
+            git rebase --abort 2>/dev/null || true
             git pull --rebase --autostash -q origin main || true
             sleep 5
           done
-          git push
+          # 이 표시는 다음에 같은 책이 또 걸리지 않게 하는 것뿐입니다.
+          # 여기서 실패해도 영상과 캡션은 이미 갔으므로 전체를 죽이지 않습니다.
+          git push origin HEAD:main || echo "표시 저장 실패. 영상은 정상으로 갔습니다."
 
       - name: 영상 내려받기 (텔레그램이 실패했을 때용)
         if: always()
