@@ -16,7 +16,11 @@ permissions:
 jobs:
   # ── 버튼을 누른 경우: 그 한 건만 처리하고 끝. 보통 1분 안에 끝납니다. ──
   button:
-    if: github.event.client_payload.action != 'draft'
+    # 반드시 할 일을 하나씩 적어야 합니다. '초안이 아니면' 처럼 적었더니
+    # 릴스 요청에도 이 작업이 딸려 돌아 죽었습니다 (2026-08-07).
+    if: >-
+      github.event.client_payload.action == 'publish' ||
+      github.event.client_payload.action == 'skip'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
