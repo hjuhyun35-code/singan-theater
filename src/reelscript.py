@@ -26,6 +26,10 @@ from anthropic import Anthropic
 
 from .settings import env
 
+# 포인트 개수. 길이는 문장을 깎는 것보다 이 개수로 잡습니다.
+# 문장을 토막내면 무슨 말인지 흐려지지만, 개수를 줄이면 남은 문장은 온전합니다.
+POINTS = 2
+
 SYSTEM = """너는 인스타 릴스 대본을 쓰는 작가다.
 책을 소개하는 30~40초 세로 영상의 대본을 쓴다.
 
@@ -132,12 +136,14 @@ def _cap(text: str, limit: int) -> str:
     head = text[: limit + 1]
     comma = max(head.rfind(", "), head.rfind("? "), head.rfind("… "))
     if comma > limit * 0.5:
-        return text[:comma].rstrip(" ,")
+        return text[:comma].rstrip(" ,") + "."
 
-    # 3) 낱말 단위. 말이 끊긴 티가 덜 나게 마침표를 붙입니다.
-    space = head.rfind(" ")
-    cut = text[:space] if space > limit * 0.5 else text[:limit]
-    return cut.rstrip(" ,") + "."
+    # 3) 깨끗하게 끊을 자리가 없으면 그냥 둡니다.
+    #    낱말 단위로 자르면 "우린 수십 명 단위로만 모여 살았을." 처럼 말이
+    #    안 되는 자리에서 끊깁니다. 몇 초 긴 게 낫습니다.
+    #    길이는 장면 개수로 잡습니다(포인트를 2개로 줄인 이유).
+    print(f"    (길지만 끊을 자리가 없어 그대로 둡니다: {len(text)}자)")
+    return text
 
 
 def _material(post: dict) -> str:
@@ -183,10 +189,10 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
 
     # 길이는 부탁만으로는 안 지켜집니다. 실제로 45자짜리를 부탁했는데 14초짜리
     # 문장이 온 적이 있습니다. 넘치면 문장 단위로 잘라냅니다.
-    got["hook"]["say"] = _cap(got["hook"]["say"], 26)
+    got["hook"]["say"] = _cap(got["hook"]["say"], 28)
     for p in got["points"]:
-        p["say"] = _cap(p["say"], 32)
-    got["closing"]["say"] = _cap(got["closing"]["say"], 26)
+        p["say"] = _cap(p["say"], 36)
+    got["closing"]["say"] = _cap(got["closing"]["say"], 28)
 
     scenes = [
         {
@@ -199,7 +205,9 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
             "say": got["hook"]["say"],
         }
     ]
-    for i, p in enumerate(got["points"][:3], 1):
+    # ★ 규격에 2개라고 적어도 모델이 3개를 보냅니다. 실제로 그랬습니다.
+    #   여기서 자르지 않으면 영상이 그만큼 길어집니다.
+    for i, p in enumerate(got["points"][:POINTS], 1):
         scenes.append(
             {
                 "kind": "포인트",
@@ -227,6 +235,10 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
     print("  릴스 대본:")
     for s in scenes:
         print(f"    [{s['kind']}] {s['headline']} — {s['body'][:34]}…")
+    # 한국어는 1초에 네 글자쯤 읽힙니다. 실제 길이는 뒤에서 다시 재지만,
+    # 여기서 미리 어림잡아두면 대본만 보고도 길다는 걸 알 수 있습니다.
+    guess = sum(len(s["say"]) for s in scenes) / 4 + len(scenes) * 1.4
+    print(f"  어림잡은 길이: {guess:.0f}초")
 
     # 해시태그와 책 링크는 초안이 이미 갖고 있습니다. 모델에게 다시 짓게 하면
     # 없는 링크를 지어내거나 태그가 30개로 불어납니다.
