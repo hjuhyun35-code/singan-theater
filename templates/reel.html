@@ -1,0 +1,127 @@
+{# 릴스용 세로 화면 1080x1920.
+   카드(4:5)와 따로 두었습니다. 카드를 그대로 늘리면 여백이 이상해집니다.
+
+   ★ 애니메이션은 전부 '전체 영상 시작' 을 0초로 잡은 하나의 시계를 씁니다.
+     reel.py 가 매 프레임 document.getAnimations() 의 currentTime 을 같은 값으로
+     맞추기 때문입니다. 그래서 각 요소는 animation-delay 로 자기 차례를 잡습니다.
+     (Web Animations 의 currentTime 은 delay 를 포함합니다)
+     fill-mode: both 가 없으면 차례가 오기 전/끝난 뒤에 원래 모습으로 돌아가 깜빡입니다. #}
+<style>
+  @font-face {
+    font-family: "포스터체";
+    src: url("{{ display_font }}") format("truetype");
+    font-weight: 400;
+    font-display: block;
+  }
+  :root {
+    --bg: #FFFFFF;
+    --ink: #141414;
+    --soft: #3D3D3D;
+    --accent: #E23E2C;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--bg); }
+  body {
+    font-family: "포스터체", "Malgun Gothic", "Noto Sans CJK KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .stage { position: relative; width: 1080px; height: 1920px; }
+
+  /* 표지를 아주 크게 깔고 흐리게 눌러 배경으로 씁니다.
+     흰 바탕만 있으면 영상이 밋밋해서 시선이 안 붙습니다. */
+  .bg {
+    position: absolute; inset: -60px;
+    background-image: url("{{ cover_url }}");
+    background-size: cover; background-position: center;
+    filter: blur(46px) saturate(0.7);
+    opacity: 0.16;
+    animation: bgzoom {{ '%.2f'|format(total) }}s linear both;
+  }
+  @keyframes bgzoom { from { transform: scale(1.0); } to { transform: scale(1.14); } }
+
+  .scene {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 0 96px;
+  }
+
+  .kicker {
+    font-size: 40px; letter-spacing: 0.22em; color: var(--accent);
+    margin-bottom: 34px;
+  }
+  .head { font-size: 128px; line-height: 1.08; letter-spacing: -0.03em; color: var(--ink); }
+  .head .w { display: inline-block; margin-right: 0.22em; }
+  .head .hot { color: var(--accent); }
+  .body {
+    margin-top: 44px; font-family: "Malgun Gothic", "Noto Sans CJK KR", sans-serif;
+    font-size: 46px; line-height: 1.62; color: var(--soft); max-width: 860px;
+  }
+
+  /* 낱말이 아래에서 툭 올라옵니다 */
+  @keyframes wordin {
+    from { opacity: 0; transform: translateY(46px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes softin {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* 마지막 표지 장면 */
+  .cover-scene { align-items: center; text-align: center; }
+  .cover-scene .shot {
+    width: 620px; height: 880px; object-fit: cover;
+    box-shadow: 0 40px 90px rgba(0,0,0,0.24);
+    margin-bottom: 64px;
+  }
+  .cover-scene .head { font-size: 92px; }
+  .cover-scene .body { margin-top: 26px; font-size: 44px; }
+  .brand {
+    position: absolute; bottom: 96px; left: 0; right: 0; text-align: center;
+    font-size: 38px; letter-spacing: 0.3em; color: var(--accent);
+  }
+
+  {% for s in scenes %}
+  /* {{ loop.index }}번 장면 — {{ '%.1f'|format(s.start) }}초부터 {{ '%.1f'|format(s.dur) }}초 */
+  @keyframes show{{ s.index }} {
+    0% { opacity: 0; }
+    {{ '%.2f'|format(38 / s.dur) }}% { opacity: 1; }
+    {{ '%.2f'|format(100 - 38 / s.dur) }}% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  #s{{ s.index }} {
+    animation: show{{ s.index }} {{ '%.3f'|format(s.dur) }}s linear {{ '%.3f'|format(s.start) }}s both;
+  }
+  {% endfor %}
+</style>
+
+<div class="stage">
+  <div class="bg"></div>
+
+  {% for s in scenes %}
+  <div class="scene {% if s.kind == '표지' %}cover-scene{% endif %}" id="s{{ s.index }}">
+    {% if s.kind == '표지' %}
+      <img class="shot" src="{{ cover_url }}"
+           style="animation: softin 0.7s ease-out {{ '%.3f'|format(s.start + 0.10) }}s both">
+    {% elif s.kicker %}
+      <div class="kicker"
+           style="animation: softin 0.5s ease-out {{ '%.3f'|format(s.start + 0.08) }}s both">{{ s.kicker }}</div>
+    {% endif %}
+
+    <div class="head">
+      {%- for w in s.words -%}
+      <span class="w {% if w.hot %}hot{% endif %}"
+            style="animation: wordin 0.52s cubic-bezier(.2,.8,.25,1) {{ '%.3f'|format(s.start + 0.18 + loop.index0 * 0.075) }}s both">{{ w.text }}</span>
+      {%- endfor -%}
+    </div>
+
+    {% if s.body %}
+    <div class="body"
+         style="animation: softin 0.6s ease-out {{ '%.3f'|format(s.start + 0.28 + s.words|length * 0.075) }}s both">{{ s.body }}</div>
+    {% endif %}
+
+    {% if s.kind == '표지' %}<div class="brand">신간극장</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>

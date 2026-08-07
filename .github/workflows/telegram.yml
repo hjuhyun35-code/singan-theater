@@ -41,6 +41,49 @@ jobs:
           TG_MESSAGE_ID: ${{ github.event.client_payload.message_id }}
         run: python scripts/tg_action.py
 
+  # ── "릴스" 라고 보낸 경우: 이미 만든 초안으로 세로 영상을 만들어 보냅니다. ──
+  # 문구를 다시 짓지 않으므로 모델 비용이 들지 않습니다.
+  # 인스타에 직접 올리지 않습니다 — 앱의 음악 목록은 API 로 못 붙입니다.
+  reel:
+    if: github.event.client_payload.action == 'reel'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 한글 폰트 설치
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-color-emoji
+          fc-cache -f
+
+      - name: 패키지 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: 영상 만들어 보내기
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          REEL_SLUG: ${{ github.event.client_payload.slug }}
+        run: python scripts/make_reel.py
+
+      - name: 영상 내려받기 (텔레그램이 실패했을 때용)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reel
+          path: posts/**/reel.mp4
+          retention-days: 7
+          if-no-files-found: ignore
+
   # ── "초안" 이라고 보낸 경우: 새로 만들어 텔레그램으로 보냅니다. 10~20분. ──
   draft:
     if: github.event.client_payload.action == 'draft'

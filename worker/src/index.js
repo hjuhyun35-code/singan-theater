@@ -109,7 +109,27 @@ export default {
 
     // ── 메시지를 보낸 경우 ──────────────────────────────
     if (msg && typeof msg.text === "string") {
-      if (msg.text.includes("초안")) {
+      const text = msg.text.trim();
+
+      // "릴스" 또는 "영상" → 세로 영상을 만듭니다.
+      // 뒤에 초안 번호를 붙이면 그 초안으로, 안 붙이면 가장 최근 초안으로 만듭니다.
+      //   릴스            → 최근 것
+      //   릴스 20260806-1 → 그 초안
+      if (text.includes("릴스") || text.includes("영상")) {
+        const slug = (text.match(/\d{8}-\d+/) || [""])[0];
+        await tell(env, "sendMessage", {
+          chat_id: chatId,
+          text:
+            "영상을 만들기 시작했습니다" +
+            (slug ? ` (${slug})` : " (가장 최근 초안)") +
+            ".\n10~20분 걸립니다. 다 되면 여기로 보내드립니다.\n\n" +
+            "음악은 안 들어갑니다. 받으신 뒤 인스타 앱에서 붙여 올려주세요.",
+        });
+        await wake(env, { action: "reel", slug, chat_id: chatId });
+        return new Response("ok");
+      }
+
+      if (text.includes("초안")) {
         await tell(env, "sendMessage", {
           chat_id: chatId,
           text:
@@ -119,12 +139,15 @@ export default {
         await wake(env, { action: "draft", chat_id: chatId });
         return new Response("ok");
       }
+
       // 뭘 할 수 있는지 알려줍니다.
       await tell(env, "sendMessage", {
         chat_id: chatId,
         text:
           "이렇게 쓰시면 됩니다.\n\n" +
-          "• 초안  — 오늘치 초안을 새로 만듭니다 (10~20분)\n" +
+          "• 초안 — 오늘치 초안을 새로 만듭니다 (10~20분)\n" +
+          "• 릴스 — 최근 초안으로 세로 영상을 만듭니다 (10~20분, 음악 없음)\n" +
+          "• 릴스 20260806-1 — 그 초안으로 영상을 만듭니다\n" +
           "• 카드 아래 [승인하고 올리기] 버튼 — 인스타에 올립니다 (1분 안)",
       });
     }
