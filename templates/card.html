@@ -26,24 +26,31 @@
     --line: rgba(245,241,234,0.12);      /* 구분선 */
     --frame: rgba(212,175,106,0.20);     /* 바깥 테두리 */
     --shadow: rgba(0,0,0,0.66);
+    /* 가장자리를 눌러 가운데로 시선을 모으는 그늘. 어두운 테마에서만 세게 씁니다.
+       밝은 테마에 이 값을 그대로 쓰면 흰 바탕이 때 탄 것처럼 칙칙해집니다. */
+    --vignette: rgba(0,0,0,0.62);
   }
   body.t-아이보리 {
     --bg-a: #FBF6EC; --bg-b: #F3EADA;
     --ink: #241F19; --ink-soft: #4A4137; --ink-dim: #8C8172;
     --accent: #B4703A; --line: rgba(36,31,25,0.14);
     --frame: rgba(180,112,58,0.28); --shadow: rgba(90,70,45,0.22);
+    --vignette: rgba(120,100,70,0.07);
   }
   body.t-종이 {
     --bg-a: #FFFFFF; --bg-b: #F4F4F2;
     --ink: #141414; --ink-soft: #3D3D3D; --ink-dim: #8A8A8A;
     --accent: #E23E2C; --line: rgba(20,20,20,0.12);
     --frame: rgba(20,20,20,0.10); --shadow: rgba(0,0,0,0.18);
+    /* 흰 바탕은 그늘을 아예 안 씁니다. 조금만 넣어도 지저분해 보입니다. */
+    --vignette: rgba(0,0,0,0);
   }
   body.t-쪽빛 {
     --bg-a: #16233A; --bg-b: #0E1626;
     --ink: #F2F5FA; --ink-soft: #BFCADB; --ink-dim: #7A8699;
     --accent: #7FB3E8; --line: rgba(242,245,250,0.13);
     --frame: rgba(127,179,232,0.22); --shadow: rgba(0,0,0,0.6);
+    --vignette: rgba(0,0,0,0.55);
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -328,7 +335,7 @@
   .s-포스터 .card::after {
     inset: 0;
     border: none;
-    box-shadow: inset 0 0 200px 70px rgba(0, 0, 0, 0.62);
+    box-shadow: inset 0 0 200px 70px var(--vignette);
   }
 
   /* 표지 자리를 크게 잡고, 글이 길면 그만큼만 알아서 줄어듭니다.
