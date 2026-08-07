@@ -82,10 +82,13 @@ def main() -> int:
         return 1
 
     print(f"{len(voices)}개를 보냅니다. 문장: {text[:30]}…")
-    work = Path(tempfile.mkdtemp(prefix="voice-"))
+    # 텔레그램에서 안 들린다는 경우가 있어 파일도 남깁니다.
+    # 워크플로가 이 폴더를 통째로 올려두면 브라우저에서 내려받을 수 있습니다.
+    work = Path(os.environ.get("VOICE_OUT") or tempfile.mkdtemp(prefix="voice-"))
+    work.mkdir(parents=True, exist_ok=True)
     for i, v in enumerate(voices, 1):
         name = v["ShortName"]
-        mp3 = work / f"{name}.mp3"
+        mp3 = work / f"{i:02d}_{name}.mp3"
         asyncio.run(edge_tts.Communicate(text, name, rate=rate).save(str(mp3)))
         # 사람이 알아볼 수 있게 성격 설명을 같이 붙입니다.
         note = ", ".join(

@@ -48,4 +48,15 @@ jobs:
             *)    export VOICE_GENDER= ;;
           esac
           if [ "${{ inputs.multilingual }}" = "예" ]; then export VOICE_MULTI=1; fi
+          export VOICE_OUT="$GITHUB_WORKSPACE/voice_samples"
           python tools/voice_demo.py
+
+      - name: 견본 파일 남기기
+        # 텔레그램에서 소리가 안 들릴 때 여기서 내려받아 들을 수 있습니다.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voices
+          path: voice_samples/*.mp3
+          retention-days: 7
+          if-no-files-found: ignore
