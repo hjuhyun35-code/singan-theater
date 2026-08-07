@@ -36,9 +36,7 @@ from .card import display_font_uri
 ROOT = Path(__file__).resolve().parent.parent
 WIDTH, HEIGHT = 1080, 1920
 FPS = 24
-# 말이 끝난 뒤 이만큼 더 보여줍니다. 바로 넘어가면 숨 쉴 틈이 없습니다.
-TAIL = 0.55
-MIN_SCENE = 2.2
+MIN_SCENE = 2.6
 JPEG_QUALITY = 92
 
 _env = Environment(
@@ -117,16 +115,44 @@ def _duration(path: Path) -> float:
     return float(out.stdout.strip())
 
 
-def narrate(scenes: list[dict], work: Path, voice: str, rate: str) -> list[float]:
-    """장면마다 읽은 소리를 만들고, 각 장면이 몇 초짜리인지 돌려줍니다."""
-    durations: list[float] = []
+def narrate(
+    scenes: list[dict], work: Path, voice: str, rate: str, gap: float, tails: dict
+) -> list[dict]:
+    """장면마다 소리를 만들고 시간표를 짭니다.
+
+    큰 글씨(제목)와 본문을 따로 읽힙니다. 한 덩어리로 읽으면 큰 글씨가 뜨자마자
+    설명이 붙어 숨 쉴 틈이 없습니다. 사이에 gap 만큼 조용히 둡니다.
+    끝나는 장면(여운·표지)은 tail 을 길게 잡아 더 머무릅니다.
+    """
+    plan: list[dict] = []
     for i, sc in enumerate(scenes):
-        mp3 = work / f"say{i:02d}.mp3"
-        asyncio.run(_speak(sc["say"], voice, rate, mp3))
-        d = _duration(mp3)
-        durations.append(max(MIN_SCENE, d + TAIL))
-        print(f"  {i+1}번 장면 {durations[-1]:.1f}초  ({sc['say'][:24]}…)")
-    return durations
+        head_mp3 = work / f"h{i:02d}.mp3"
+        asyncio.run(_speak(sc["headline"], voice, rate, head_mp3))
+        head_len = _duration(head_mp3)
+
+        body_mp3, body_len = None, 0.0
+        if sc["body"]:
+            body_mp3 = work / f"b{i:02d}.mp3"
+            asyncio.run(_speak(sc["body"], voice, rate, body_mp3))
+            body_len = _duration(body_mp3)
+
+        tail = tails.get(sc["kind"], tails["기본"])
+        spoken = head_len + (gap + body_len if body_mp3 else 0.0)
+        dur = max(MIN_SCENE, spoken + tail)
+        plan.append(
+            {
+                "head": head_mp3,
+                "body": body_mp3,
+                "body_start": head_len + gap,
+                "dur": dur,
+                "tail": tail,
+            }
+        )
+        print(
+            f"  {i+1}번 장면 {dur:.1f}초 (읽기 {spoken:.1f} + 여운 {tail:.1f})"
+            f"  {sc['headline'][:20]}…"
+        )
+    return plan
 
 
 def _words(headline: str, emphasis: str) -> list[dict]:
@@ -139,7 +165,7 @@ def _words(headline: str, emphasis: str) -> list[dict]:
 
 def render_frames(
     scenes: list[dict],
-    durations: list[float],
+    plan: list[dict],
     cover_url: str,
     theme: str,
     accent: str | None,
@@ -151,15 +177,17 @@ def render_frames(
     멈춰 세우고 '지금 몇 초' 를 직접 지정한 뒤 찍습니다. 프레임이 정확히 맞습니다.
     """
     starts, t = [], 0.0
-    for d in durations:
+    for item in plan:
         starts.append(t)
-        t += d
+        t += item["dur"]
     total = t
 
     html = _env.get_template("reel.html").render(
         scenes=[
             {**sc, "words": _words(sc["headline"], sc["emphasis"]),
-             "start": starts[i], "dur": durations[i], "index": i}
+             "start": starts[i], "dur": plan[i]["dur"],
+             # 본문 글은 본문을 읽기 시작할 때 맞춰 뜹니다. 낱말 수로 어림잡던 것보다 정확합니다.
+             "body_at": plan[i]["body_start"], "index": i}
             for i, sc in enumerate(scenes)
         ],
         cover_url=cover_url,
@@ -189,17 +217,46 @@ def render_frames(
     return count
 
 
-def build_audio(durations: list[float], work: Path) -> Path:
-    """장면마다 만든 소리를 장면 길이에 맞춰 늘려 이어붙입니다.
+def _to_wav(src: Path, dst: Path) -> Path:
+    """이어붙이기 전에 형식을 통일합니다. 섞여 있으면 concat 이 어긋납니다."""
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(src),
+         "-ar", "44100", "-ac", "2", str(dst)],
+        check=True,
+    )
+    return dst
 
-    말이 장면보다 짧으면 뒤를 조용히 채웁니다. 안 그러면 소리와 화면이 밀립니다.
+
+def _silence(seconds: float, dst: Path) -> Path:
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi",
+         "-i", "anullsrc=r=44100:cl=stereo", "-t", f"{seconds:.3f}", str(dst)],
+        check=True,
+    )
+    return dst
+
+
+def build_audio(plan: list[dict], work: Path, gap: float) -> Path:
+    """제목 → 조용함 → 본문 → 조용함 순으로 이어붙여 한 줄기 소리를 만듭니다.
+
+    장면 길이에 정확히 맞춰 뒤를 채웁니다. 안 그러면 소리와 화면이 밀립니다.
     """
+    hush = _silence(gap, work / "gap.wav")
     padded = []
-    for i, d in enumerate(durations):
+    for i, item in enumerate(plan):
+        pieces = [_to_wav(item["head"], work / f"hw{i:02d}.wav")]
+        if item["body"]:
+            pieces += [hush, _to_wav(item["body"], work / f"bw{i:02d}.wav")]
+
+        part_list = work / f"p{i:02d}.txt"
+        part_list.write_text(
+            "\n".join(f"file '{p.as_posix()}'" for p in pieces), encoding="utf-8"
+        )
         out = work / f"pad{i:02d}.wav"
         subprocess.run(
-            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(work / f"say{i:02d}.mp3"),
-             "-af", f"apad=whole_dur={d:.3f}", "-t", f"{d:.3f}",
+            ["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0",
+             "-i", str(part_list),
+             "-af", f"apad=whole_dur={item['dur']:.3f}", "-t", f"{item['dur']:.3f}",
              "-ar", "44100", "-ac", "2", str(out)],
             check=True,
         )
@@ -242,21 +299,28 @@ def make_reel(post: dict, config: dict, out_path: Path) -> Path:
     설정 = config.get("영상", {})
     voice = 설정.get("목소리", "ko-KR-SunHiNeural")
     rate = 설정.get("말속도", "+6%")
+    gap = float(설정.get("쉼", 0.85))
+    tails = {
+        "기본": float(설정.get("여운", 0.9)),
+        # 마무리는 길게 머무릅니다. 바로 끊기면 남는 게 없습니다.
+        "여운": float(설정.get("끝여운", 2.4)),
+        "표지": float(설정.get("끝여운", 2.4)),
+    }
 
     scenes = build_script(post, config)
     work = Path(tempfile.mkdtemp(prefix="reel-"))
     try:
-        print(f"  목소리 {voice} · 속도 {rate}")
-        durations = narrate(scenes, work, voice, rate)
+        print(f"  목소리 {voice} · 속도 {rate} · 쉼 {gap}초 · 끝여운 {tails['여운']}초")
+        plan = narrate(scenes, work, voice, rate, gap, tails)
         render_frames(
             scenes,
-            durations,
+            plan,
             post.get("cover_url", "") or post.get("cover_url_fallback", ""),
             config.get("발행", {}).get("색테마", "종이"),
             None,
             work / "frames",
         )
-        audio = build_audio(durations, work)
+        audio = build_audio(plan, work, gap)
         mux(work / "frames", audio, out_path)
         print(f"  영상 완성: {out_path.name} ({out_path.stat().st_size/1e6:.1f}MB)")
         return out_path
