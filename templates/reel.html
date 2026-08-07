@@ -83,12 +83,18 @@
   }
 
   {% for s in scenes %}
-  /* {{ loop.index }}번 장면 — {{ '%.1f'|format(s.start) }}초부터 {{ '%.1f'|format(s.dur) }}초 */
+  /* {{ loop.index }}번 장면 — {{ '%.1f'|format(s.start) }}초부터 {{ '%.1f'|format(s.dur) }}초
+     ★ 마지막 장면은 사라지지 않습니다. 다른 장면처럼 흐려지게 두면 영상이
+       빈 흰 화면으로 끝나 '끝난 것 같지 않다' 는 느낌이 납니다. */
   @keyframes show{{ s.index }} {
     0% { opacity: 0; }
     {{ '%.2f'|format(38 / s.dur) }}% { opacity: 1; }
+    {%- if loop.last %}
+    100% { opacity: 1; }
+    {%- else %}
     {{ '%.2f'|format(100 - 38 / s.dur) }}% { opacity: 1; }
     100% { opacity: 0; }
+    {%- endif %}
   }
   #s{{ s.index }} {
     animation: show{{ s.index }} {{ '%.3f'|format(s.dur) }}s linear {{ '%.3f'|format(s.start) }}s both;
@@ -123,7 +129,11 @@
          style="animation: softin 0.6s ease-out {{ '%.3f'|format(s.start + [s.body_at - 0.25, 0.3]|max) }}s both">{{ s.body }}</div>
     {% endif %}
 
-    {% if s.kind == '표지' %}<div class="brand">신간극장</div>{% endif %}
+    {# 맺음말은 제목·작가를 다 읽은 뒤에 떠야 닫는 느낌이 납니다. #}
+    {% if s.kind == '표지' %}
+    <div class="brand"
+         style="animation: softin 0.7s ease-out {{ '%.3f'|format(s.start + s.body_at + 0.9) }}s both">{{ s.outro_line or '신간극장' }}</div>
+    {% endif %}
   </div>
   {% endfor %}
 </div>

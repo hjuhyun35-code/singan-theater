@@ -83,15 +83,20 @@ def build_script(post: dict, config: dict) -> list[dict]:
             }
         )
 
-    # 마지막은 표지와 책 정보. 여기서 계정 이름을 남깁니다.
+    # 마지막은 표지와 책 정보. 맺음말로 확실히 닫습니다.
+    # 이 한 줄이 없으면 소리가 그냥 끊겨 '끝난 것 같지 않다' 는 느낌이 납니다.
+    title = post.get("short_title") or post.get("title", "")
+    author = post.get("author", "")
+    closing = config.get("영상", {}).get("맺음말", "매일 한 권, 신간극장")
     scenes.append(
         {
             "kind": "표지",
             "kicker": "",
-            "headline": post.get("short_title") or post.get("title", ""),
+            "headline": title,
             "emphasis": "",
-            "body": post.get("author", ""),
-            "say": f"{post.get('short_title') or post.get('title', '')}. {post.get('author', '')}",
+            "body": author,
+            "outro_line": closing,
+            "say": f"{title}. {author}. {closing}",
         }
     )
     return scenes
