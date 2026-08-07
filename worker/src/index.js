@@ -16,6 +16,19 @@
 
 const TG = "https://api.telegram.org/bot";
 
+/**
+ * 입력창 아래에 늘 떠 있는 버튼.
+ * 글자를 치지 않아도 되도록 붙입니다. 누르면 그 글자가 그대로 전송되고,
+ * 아래 처리 규칙이 '초안' / '릴스' 를 알아봅니다.
+ * is_persistent 를 켜야 한 번 누른 뒤에도 사라지지 않습니다.
+ */
+const KEYS = {
+  keyboard: [[{ text: "📄 초안 만들기" }, { text: "🎬 릴스 만들기" }]],
+  is_persistent: true,
+  resize_keyboard: true,
+  input_field_placeholder: "버튼을 누르거나 직접 쳐도 됩니다",
+};
+
 /** 텔레그램에 짧게 한 마디 합니다. 실패해도 전체를 멈추지 않습니다. */
 async function tell(env, method, body) {
   try {
@@ -121,9 +134,10 @@ export default {
           chat_id: chatId,
           text:
             "영상을 만들기 시작했습니다" +
-            (slug ? ` (${slug})` : " (가장 최근 초안)") +
-            ".\n10~20분 걸립니다. 다 되면 여기로 보내드립니다.\n\n" +
+            (slug ? ` (${slug})` : " (후기가 가장 많은 초안)") +
+            ".\n3~5분 걸립니다. 다 되면 영상과 캡션을 여기로 보내드립니다.\n\n" +
             "음악은 안 들어갑니다. 받으신 뒤 인스타 앱에서 붙여 올려주세요.",
+          reply_markup: KEYS,
         });
         await wake(env, { action: "reel", slug, chat_id: chatId });
         return new Response("ok");
@@ -135,20 +149,23 @@ export default {
           text:
             "초안을 만들기 시작했습니다.\n" +
             "카드가 나오기까지 10~20분 걸립니다. 다 되면 여기로 보내드립니다.",
+          reply_markup: KEYS,
         });
         await wake(env, { action: "draft", chat_id: chatId });
         return new Response("ok");
       }
 
-      // 뭘 할 수 있는지 알려줍니다.
+      // 뭘 할 수 있는지 알려주고, 버튼도 같이 붙여둡니다.
       await tell(env, "sendMessage", {
         chat_id: chatId,
         text:
-          "이렇게 쓰시면 됩니다.\n\n" +
-          "• 초안 — 오늘치 초안을 새로 만듭니다 (10~20분)\n" +
-          "• 릴스 — 최근 초안으로 세로 영상을 만듭니다 (10~20분, 음악 없음)\n" +
-          "• 릴스 20260806-1 — 그 초안으로 영상을 만듭니다\n" +
-          "• 카드 아래 [승인하고 올리기] 버튼 — 인스타에 올립니다 (1분 안)",
+          "아래 버튼을 누르시면 됩니다.\n\n" +
+          "📄 초안 만들기 — 새 책을 골라 카드 5장 (10~20분)\n" +
+          "🎬 릴스 만들기 — 후기 많은 초안으로 세로 영상 (3~5분)\n\n" +
+          "카드가 오면 그 아래 [승인하고 올리기] 를 누르세요. 1분 안에 인스타에 올라갑니다.\n" +
+          "릴스는 음악이 없습니다. 받으신 뒤 앱에서 음악을 붙여 올려주세요.\n\n" +
+          "특정 초안으로 영상을 만들려면 '릴스 20260806-1' 처럼 번호를 붙이세요.",
+        reply_markup: KEYS,
       });
     }
 
