@@ -28,12 +28,26 @@ DEFAULT_TEXT = (
 )
 
 
-async def korean_voices(gender: str) -> list[dict]:
+async def korean_voices(gender: str, multilingual: bool = False) -> list[dict]:
+    """한국어를 읽을 수 있는 목소리를 모읍니다.
+
+    ko-KR 목소리는 수가 아주 적습니다(2026-08 기준 여성은 SunHi 하나뿐).
+    그래서 여러 언어를 하는 Multilingual 목소리도 함께 볼 수 있게 했습니다.
+    이 목소리들은 다른 나라 이름을 달고 있어도 한국어를 읽습니다.
+    억양이 어색할 수 있어 반드시 귀로 확인하고 골라야 합니다.
+    """
     voices = await edge_tts.list_voices()
     picked = [
         v for v in voices
         if v.get("Locale") == "ko-KR" and (not gender or v.get("Gender") == gender)
     ]
+    if multilingual:
+        picked += [
+            v for v in voices
+            if "Multilingual" in v.get("ShortName", "")
+            and v.get("Locale") != "ko-KR"
+            and (not gender or v.get("Gender") == gender)
+        ]
     return sorted(picked, key=lambda v: v["ShortName"])
 
 
@@ -61,7 +75,8 @@ def main() -> int:
     text = (os.environ.get("VOICE_TEXT") or "").strip() or DEFAULT_TEXT
     rate = os.environ.get("VOICE_RATE", "+6%")
 
-    voices = asyncio.run(korean_voices(gender))
+    multi = os.environ.get("VOICE_MULTI", "").strip() == "1"
+    voices = asyncio.run(korean_voices(gender, multi))
     if not voices:
         print(f"{gender} 한국어 목소리를 찾지 못했습니다.")
         return 1
