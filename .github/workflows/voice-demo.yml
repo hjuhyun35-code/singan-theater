@@ -1,0 +1,44 @@
+name: 목소리 들어보기
+
+# 릴스에 쓸 목소리를 고르려고 견본을 텔레그램으로 보냅니다.
+# 마음에 드는 것을 고른 뒤 config.json 의 영상.목소리 를 그 이름으로 바꾸면 됩니다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      gender:
+        description: "여자 / 남자 / 전부"
+        required: true
+        default: "여자"
+        type: choice
+        options: ["여자", "남자", "전부"]
+      text:
+        description: "읽힐 문장 (비우면 기본 문장)"
+        required: false
+        default: ""
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install edge-tts requests
+
+      - name: 견본 만들어 보내기
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          VOICE_TEXT: ${{ inputs.text }}
+        run: |
+          case "${{ inputs.gender }}" in
+            여자) export VOICE_GENDER=Female ;;
+            남자) export VOICE_GENDER=Male ;;
+            *)    export VOICE_GENDER= ;;
+          esac
+          python tools/voice_demo.py
