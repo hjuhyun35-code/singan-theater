@@ -36,48 +36,44 @@ SYSTEM = """너는 인스타 릴스 대본을 쓰는 작가다.
 - 과장 광고 표현(인생책, 필독, 충격, 소름)을 쓰지 마라.
 - 마지막은 반드시 할 일을 정확히 말하고 닫아라. 여운으로 흐리지 마라."""
 
+# ★ 항목 이름은 반드시 영문이어야 합니다.
+#   Claude 도구 정의는 '^[a-zA-Z0-9_.-]{1,64}$' 만 받습니다.
+#   한글로 뒀다가 400 오류로 계속 거부당했습니다 (2026-08-07).
+#   sub = 자막(화면에 크게 뜨는 짧은 글), say = 대사(읽어줄 말)
+_BEAT = {
+    "type": "object",
+    "properties": {
+        "sub": {"type": "string", "description": "자막. 화면에 크게 뜨는 짧은 글."},
+        "say": {"type": "string", "description": "대사. 읽어줄 말. 말하듯 자연스럽게."},
+    },
+    "required": ["sub", "say"],
+}
+
 TOOL = {
     "name": "write_reel",
     "description": "릴스 대본 한 편",
     "input_schema": {
         "type": "object",
         "properties": {
-            "훅": {
-                "type": "object",
-                "description": "첫 2초. 여기서 못 잡으면 나머지는 안 본다.",
-                "properties": {
-                    "자막": {"type": "string", "description": "12자 안팎. 화면에 크게 뜬다."},
-                    "대사": {"type": "string", "description": "한 문장. 20자 안팎. 짧을수록 좋다."},
-                },
-                "required": ["자막", "대사"],
+            "hook": {
+                **_BEAT,
+                "description": "첫 2초. 여기서 못 잡으면 나머지는 안 본다. 자막 12자, 대사 20자 안팎.",
             },
-            "포인트": {
+            "points": {
                 "type": "array",
                 "minItems": 3,
                 "maxItems": 3,
-                "description": "이 책이 무엇을 말하는지 셋으로 나눠 보여준다.",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "자막": {"type": "string", "description": "14자 안팎"},
-                        "대사": {"type": "string", "description": "한두 문장. 40자 안팎"},
-                    },
-                    "required": ["자막", "대사"],
-                },
+                "description": "이 책이 무엇을 말하는지 셋으로 나눈다. 자막 14자, 대사 40자 안팎.",
+                "items": _BEAT,
             },
-            "맺음": {
-                "type": "object",
-                "description": "마지막. 할 일을 정확히 말하고 닫는다.",
-                "properties": {
-                    "자막": {"type": "string", "description": "10자 안팎. 예: 저장해두고 읽기"},
-                    "대사": {
-                        "type": "string",
-                        "description": "저장이나 팔로우를 정확히 말한다. 한두 문장.",
-                    },
-                },
-                "required": ["자막", "대사"],
+            "closing": {
+                **_BEAT,
+                "description": (
+                    "마지막. 저장이나 팔로우를 정확히 말하고 닫는다. "
+                    "자막 10자 안팎(예: 저장해두고 읽기)."
+                ),
             },
-            "캡션": {
+            "caption": {
                 "type": "string",
                 "description": (
                     "인스타에 붙여넣을 글. 3~5줄. 첫 줄은 더보기 전에 보이는 줄이라 "
@@ -86,7 +82,7 @@ TOOL = {
                 ),
             },
         },
-        "required": ["훅", "포인트", "맺음", "캡션"],
+        "required": ["hook", "points", "closing", "caption"],
     },
 }
 
@@ -136,21 +132,21 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
         {
             "kind": "훅",
             "kicker": "",
-            "headline": got["훅"]["자막"],
+            "headline": got["hook"]["sub"],
             "emphasis": "",
-            "body": got["훅"]["대사"],
-            "say": got["훅"]["대사"],
+            "body": got["hook"]["say"],
+            "say": got["hook"]["say"],
         }
     ]
-    for i, p in enumerate(got["포인트"][:3], 1):
+    for i, p in enumerate(got["points"][:3], 1):
         scenes.append(
             {
                 "kind": "포인트",
                 "kicker": f"0{i}",
-                "headline": p["자막"],
+                "headline": p["sub"],
                 "emphasis": "",
-                "body": p["대사"],
-                "say": p["대사"],
+                "body": p["say"],
+                "say": p["say"],
             }
         )
     # 마지막은 표지 화면 위에 CTA 를 얹습니다. CTA 장면과 표지 장면을 따로 두면
@@ -160,11 +156,11 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
         {
             "kind": "표지",
             "kicker": "",
-            "headline": got["맺음"]["자막"],
+            "headline": got["closing"]["sub"],
             "emphasis": "",
             "body": f"{title} · {post.get('author','')}",
             "outro_line": closing,
-            "say": f"{got['맺음']['대사']} {title}, {post.get('author','')}. {closing}",
+            "say": f"{got['closing']['say']} {title}, {post.get('author','')}. {closing}",
         }
     )
     print("  릴스 대본:")
@@ -175,6 +171,6 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
     # 없는 링크를 지어내거나 태그가 30개로 불어납니다.
     tags = " ".join(post.get("hashtags", []) or [])
     caption = "\n\n".join(
-        p for p in [got["캡션"].strip(), tags, post.get("link", "")] if p
+        p for p in [got["caption"].strip(), tags, post.get("link", "")] if p
     )
     return scenes, caption
