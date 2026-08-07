@@ -56,11 +56,15 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: 한글 폰트 설치
+      - name: 한글 폰트와 ffmpeg 설치
+        # ffmpeg 는 GitHub 서버에 없습니다. 직접 깔아야 합니다.
+        # (2026-08-07 있는 줄 알고 안 깔았다가 ffprobe 없음으로 실패했습니다)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-color-emoji
+          sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-color-emoji ffmpeg
           fc-cache -f
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
 
       - name: 패키지 설치
         run: |
