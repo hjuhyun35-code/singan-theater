@@ -57,15 +57,32 @@ def main() -> int:
         print("  · 아직 안 눌렀다")
         return 0
 
+    chat_ids = set()
     for u in updates:
         kind = "callback_query" if "callback_query" in u else next(iter(u.keys() - {"update_id"}), "?")
         line = f"  #{u['update_id']} {kind}"
+        chat = {}
         if "callback_query" in u:
             q = u["callback_query"]
             line += f"  data={q.get('data')!r}"
             line += f"  보낸봇메시지id={q.get('message', {}).get('message_id')}"
+            chat = q.get("message", {}).get("chat", {})
+        else:
+            body = u.get(kind)
+            if isinstance(body, dict):
+                chat = body.get("chat", {})
+                if body.get("text"):
+                    line += f"  글={body['text'][:30]!r}"
+        if chat.get("id") is not None:
+            chat_ids.add(chat["id"])
+            line += f"  대화방={chat['id']}"
         print(line)
     print(f"\n총 {len(updates)}건. 이 상태로 '버튼 확인' 을 돌리면 처리됩니다.")
+
+    # Cloudflare Worker 의 ALLOWED_CHAT_ID 에 넣을 값입니다.
+    # 열쇠가 아니라 그냥 방 번호라 로그에 찍혀도 괜찮습니다.
+    if chat_ids:
+        print("\n대화방 번호 (ALLOWED_CHAT_ID):", ", ".join(str(c) for c in sorted(chat_ids)))
     return 0
 
 
