@@ -123,7 +123,7 @@
     }
   ],
   "created_at": "2026-08-07T05:22:01+00:00",
-  "published": false,
+  "published": true,
   "tray": "베스트셀러",
   "research_len": 1670,
   "research_sources": [
@@ -135,5 +135,9 @@
     "https://library.forest.go.kr/detailview.do?action=detailView&searchSubId=0&pageIndex=1&menuPath=popularBookSESearch&MASTER_ID=7522257",
     "https://k-knowledge.kr/srch/read.jsp?id=270500384",
     "https://gimssine.com/products/9791192372730"
-  ]
+  ],
+  "published_at": "2026-08-07T06:54:33+00:00",
+  "post_ids": {
+    "instagram": "18083727065677413"
+  }
 }
