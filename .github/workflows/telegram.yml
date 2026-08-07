@@ -80,6 +80,8 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # 릴스 대본과 캡션을 쓰는 데 필요합니다. 없으면 카드 문구로 물러섭니다.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           REEL_SLUG: ${{ github.event.client_payload.slug }}
         run: python scripts/make_reel.py
 
