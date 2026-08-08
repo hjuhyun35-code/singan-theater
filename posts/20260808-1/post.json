@@ -123,7 +123,7 @@
     }
   ],
   "created_at": "2026-08-08T00:09:56+00:00",
-  "published": false,
+  "published": true,
   "tray": "베스트셀러",
   "research_len": 2333,
   "research_sources": [
@@ -135,5 +135,9 @@
     "https://jennie.theharoo.com/%EC%88%A8%EA%B2%B0%EC%9D%B4-%EB%B0%94%EB%9E%8C-%EB%90%A0-%EB%95%8C/",
     "http://www.bosa.co.kr/news/articleView.html?idxno=2147899",
     "https://news.amc.seoul.kr/news/con/detail.do?cntId=5629"
-  ]
+  ],
+  "published_at": "2026-08-08T01:46:54+00:00",
+  "post_ids": {
+    "instagram": "17869458639634163"
+  }
 }
