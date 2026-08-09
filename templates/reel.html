@@ -57,6 +57,8 @@
     margin-top: 44px; font-family: "Malgun Gothic", "Noto Sans CJK KR", sans-serif;
     font-size: 46px; line-height: 1.62; color: var(--soft); max-width: 860px;
   }
+  /* 설명글에서 가장 중요한 대목. 소리를 끄고 보는 사람에게 시선을 잡아줍니다. */
+  .body .hot { color: var(--accent); font-weight: 700; }
 
   /* 낱말이 아래에서 툭 올라옵니다 */
   @keyframes wordin {
@@ -126,7 +128,11 @@
        0.25초 먼저 띄워야 글이 자리를 잡은 뒤 소리가 시작돼 자연스럽습니다. #}
     {% if s.body %}
     <div class="body"
-         style="animation: softin 0.6s ease-out {{ '%.3f'|format(s.start + [s.body_at - 0.25, 0.3]|max) }}s both">{{ s.body }}</div>
+         style="animation: softin 0.6s ease-out {{ '%.3f'|format(s.start + [s.body_at - 0.25, 0.3]|max) }}s both">
+      {%- for part in s.body_parts -%}
+      {%- if part.hot %}<b class="hot">{{ part.t }}</b>{% else %}{{ part.t }}{% endif -%}
+      {%- endfor -%}
+    </div>
     {% endif %}
 
     {# 맺음말은 제목·작가를 다 읽은 뒤에 떠야 닫는 느낌이 납니다. #}

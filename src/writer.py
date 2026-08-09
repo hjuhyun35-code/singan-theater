@@ -110,6 +110,19 @@ TOOL = {
                     "'이 책은 ~을 다룬다' 같은 소개문으로 시작하지 마라."
                 ),
             },
+            "insta_caption": {
+                "type": "string",
+                "description": (
+                    "인스타 카드뉴스에 붙일 본문. 700~1000자. 쓰레드는 500자 제한이라 "
+                    "짧게 쓰지만 인스타는 2,200자까지 되므로 여기서 제대로 풀어 쓴다.\n"
+                    "1) 첫 줄 — 더보기 전에 보이는 한 줄. 20자 이내로 가장 센 말.\n"
+                    "2) 빈 줄을 두고, 짧은 문단 네다섯 개. 한 문단은 두세 문장. "
+                    "문단 사이마다 빈 줄을 둔다. 카드에 못 담은 이야기를 여기서 푼다.\n"
+                    "3) '이런 분께 권한다' 로 시작하는 한 줄.\n"
+                    "4) 마지막 줄 — 저장이나 팔로우를 권한다.\n"
+                    "해시태그와 책 링크는 넣지 마라. 뒤에 따로 붙는다."
+                ),
+            },
             "slides": {
                 "type": "array",
                 "description": "인스타 카드 각 장의 내용. 지정된 종류와 순서를 그대로 지켜야 한다.",
@@ -170,7 +183,10 @@ TOOL = {
                 "description": "주어진 자료가 빈약해 내용을 짐작해 썼다면 low.",
             },
         },
-        "required": ["threads_text", "slides", "search_line", "hashtags", "confidence"],
+        "required": [
+            "threads_text", "insta_caption", "slides",
+            "search_line", "hashtags", "confidence",
+        ],
     },
 }
 

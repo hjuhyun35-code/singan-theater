@@ -157,8 +157,12 @@ def build_post(book: dict, copy: dict, slug: str, config: dict) -> dict:
     link = affiliate_link(book.get("link", ""), partner)
     hashtags = " ".join(copy["hashtags"])
 
+    # 인스타 캡션은 쓰레드 글과 따로 씁니다. 쓰레드는 500자 제한이라 짧은데,
+    # 인스타는 2,200자까지 되므로 그 글을 그대로 쓰면 너무 짧습니다.
+    # 모델이 인스타용을 안 보내면 예전처럼 쓰레드 글을 씁니다.
+    body = copy.get("insta_caption") or copy["threads_text"]
     caption = "\n\n".join(
-        p for p in [copy["search_line"], copy["threads_text"], hashtags, link, credit] if p
+        p for p in [copy["search_line"], body, hashtags, link, credit] if p
     )
     threads_text = writer.compose_threads_text(
         copy["threads_text"], hashtags, link, credit

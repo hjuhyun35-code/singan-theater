@@ -81,6 +81,14 @@ _BEAT = {
     "properties": {
         "sub": {"type": "string", "description": "자막. 화면에 크게 뜨는 짧은 글."},
         "say": {"type": "string", "description": "대사. 읽어줄 말. 말하듯 자연스럽게."},
+        "say_hot": {
+            "type": "string",
+            "description": (
+                "대사 안에서 색을 다르게 줄 부분. 가장 중요한 낱말이나 짧은 구절 하나. "
+                "대사에 있는 그대로 적어야 한다(띄어쓰기 포함). "
+                "대사의 절반을 넘기지 마라."
+            ),
+        },
         "hot": {
             "type": "string",
             "description": (
@@ -90,7 +98,7 @@ _BEAT = {
             ),
         },
     },
-    "required": ["sub", "say", "hot"],
+    "required": ["sub", "say", "hot", "say_hot"],
 }
 
 TOOL = {
@@ -120,8 +128,11 @@ TOOL = {
             "closing": {
                 **_BEAT,
                 "description": (
-                    "마지막. 저장이나 팔로우를 정확히 말하고 닫는다. "
-                    "자막 10자 안팎(예: 저장해두고 읽기)."
+                    "마지막. 저장이나 팔로우를 정확히 말하고 닫는다.\n"
+                    "★ 자막에 책 제목을 쓰지 마라. 제목은 화면에 따로 나온다. "
+                    "자막은 반드시 '할 일' 이어야 한다. "
+                    "좋은 예: '저장해두고 읽기', '오늘 밤 첫 장만', '팔로우하고 매일 한 권'. "
+                    "나쁜 예: '사피엔스', '현재의 허구를 봐야 한다'."
                 ),
             },
             "caption": {
@@ -182,6 +193,24 @@ def _cap(text: str, limit: int) -> str:
     return text
 
 
+def _paragraphs(caption: str) -> str:
+    """세 번 시켜도 한 덩어리로 오면 문장 두 개씩 묶어 문단을 만듭니다.
+
+    인스타에서 줄바꿈 없는 긴 글은 아무도 안 읽습니다.
+    """
+    import re
+
+    cap = (caption or "").strip()
+    if len(cap.split("\n\n")) >= 3:
+        return cap
+    sents = [s for s in re.split(r"(?<=[.!?])\s+", cap.replace("\n", " ")) if s]
+    if len(sents) < 4:
+        return cap
+    return "\n\n".join(
+        " ".join(sents[i : i + 2]) for i in range(0, len(sents), 2)
+    )
+
+
 def _lint(got: dict) -> list[str]:
     """대사가 문체 규칙을 지켰는지 봅니다. 안 지키면 한 번 더 시킵니다.
 
@@ -211,6 +240,11 @@ def _lint(got: dict) -> list[str]:
         # 반말투가 섞였는가.
         if re.search(r"(었어|았어|해야지|거든|잖아|알아\?|이야|야\?)[.!?…]*(\s|$)", t):
             problems.append(f"반말투가 섞임: {t[-18:]!r}")
+
+    # 맺음 자막은 '할 일' 이어야 합니다. 책 제목이 나온 적이 있습니다.
+    csub = (got["closing"].get("sub") or "").strip()
+    if csub and not re.search(r"(저장|팔로우|읽|담아|보관|챙겨)", csub):
+        problems.append(f"맺음 자막이 할 일이 아니다: {csub!r} (예: 저장해두고 읽기)")
 
     # 캡션이 짧으면 읽을거리가 안 됩니다. 400자를 부탁했는데 150자가 온 적이 있습니다.
     cap = (got.get("caption") or "").strip()
@@ -271,8 +305,9 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
         "그 문구 자체를 대사에 넣지는 마라. 뒤에 따로 붙는다."
     )
 
+    # 두 번으로는 모자랐습니다. 한 번 고쳐 써도 다른 데가 어긋나 그대로 통과했습니다.
     got, warn = None, ""
-    for attempt in range(2):
+    for attempt in range(3):
         message = client.messages.create(
             model=config["모델"]["이름"],
             max_tokens=1500,
@@ -286,9 +321,10 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
             raise RuntimeError("릴스 대본을 만들지 못했습니다.")
 
         problems = _lint(got)
-        if not problems or attempt == 1:
+        if not problems or attempt == 2:
             if problems:
-                print("  ! 문체가 아직 어색합니다:", "; ".join(problems[:3]))
+                print("  ! 아직 어색한 곳이 있습니다:", "; ".join(problems[:3]))
+                got["caption"] = _paragraphs(got.get("caption", ""))
             break
         print("  문체를 고쳐 다시 씁니다:", "; ".join(problems[:3]))
         warn = (
@@ -312,6 +348,9 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
             # 강조 낱말만 다른 색으로. 카드와 같은 방식입니다.
             "emphasis": got["hook"].get("hot", ""),
             "body": got["hook"]["say"],
+            # 대사 안에서 색을 다르게 줄 부분. 소리를 끄고 보는 사람에게는
+            # 이 색이 '어디를 봐야 하는지' 를 알려줍니다.
+            "body_hot": got["hook"].get("say_hot", ""),
             "say": got["hook"]["say"],
         }
     ]
@@ -325,6 +364,7 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
                 "headline": p["sub"],
                 "emphasis": p.get("hot", ""),
                 "body": p["say"],
+                "body_hot": p.get("say_hot", ""),
                 "say": p["say"],
             }
         )

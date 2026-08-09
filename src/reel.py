@@ -182,6 +182,24 @@ def narrate(
     return plan
 
 
+def _body_parts(body: str, hot: str) -> list[dict]:
+    """설명글을 '보통 / 강조 / 보통' 으로 쪼갭니다.
+
+    소리를 끄고 보는 사람에게는 이 색이 '어디를 봐야 하는지' 를 알려줍니다.
+    모델이 대사에 없는 말을 강조로 적어 보내면 그냥 통째로 보통 글이 됩니다.
+    """
+    body = body or ""
+    hot = (hot or "").strip()
+    if not hot or hot not in body:
+        return [{"t": body, "hot": False}]
+    i = body.index(hot)
+    return [
+        {"t": body[:i], "hot": False},
+        {"t": hot, "hot": True},
+        {"t": body[i + len(hot) :], "hot": False},
+    ]
+
+
 def _words(headline: str, emphasis: str) -> list[dict]:
     """제목을 낱말로 쪼갭니다. 한 낱말씩 튀어나오게 하려는 것입니다."""
     out = []
@@ -212,6 +230,7 @@ def render_frames(
     html = _env.get_template("reel.html").render(
         scenes=[
             {**sc, "words": _words(sc["headline"], sc["emphasis"]),
+             "body_parts": _body_parts(sc.get("body", ""), sc.get("body_hot", "")),
              "start": starts[i], "dur": plan[i]["dur"],
              # 본문 글은 본문을 읽기 시작할 때 맞춰 뜹니다. 낱말 수로 어림잡던 것보다 정확합니다.
              "body_at": plan[i]["body_start"], "index": i}
