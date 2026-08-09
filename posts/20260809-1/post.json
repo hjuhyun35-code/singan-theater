@@ -123,7 +123,7 @@
     }
   ],
   "created_at": "2026-08-09T00:02:46+00:00",
-  "published": false,
+  "published": true,
   "tray": "베스트셀러",
   "research_len": 1673,
   "research_sources": [
@@ -135,5 +135,9 @@
     "https://www.youtube.com/watch?v=90Nj86RGBMA",
     "https://gimhae.egentouch.com/detailview.do?action=detailView&searchSubId=0&pageIndex=1&menuPath=popularBookSESearch&MASTER_ID=6590312",
     "https://lib.yonam.ac.kr/detailview.do?action=detailView&searchSubId=0&pageIndex=1&menuPath=popularBookSESearch&MASTER_ID=6324348"
-  ]
+  ],
+  "published_at": "2026-08-09T00:28:35+00:00",
+  "post_ids": {
+    "instagram": "18378244750231957"
+  }
 }
