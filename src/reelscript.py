@@ -320,14 +320,9 @@ def _lint(got: dict) -> list[str]:
     if csub and not re.search(r"(저장|팔로우|읽|담아|보관|챙겨)", csub):
         problems.append(f"맺음 자막이 할 일이 아니다: {csub!r} (예: 저장해두고 읽기)")
 
-    # 캡션이 짧으면 읽을거리가 안 됩니다. 400자를 부탁했는데 150자가 온 적이 있습니다.
-    # 800자를 부탁해도 300자쯤이 옵니다. 그래서 부탁은 크게 하고 기준은
-    # 실제로 받아낼 수 있는 선에 둡니다. 기준을 너무 높이면 매번 실패로 남습니다.
-    cap = (got.get("caption") or "").strip()
-    if len(cap) < 420:
-        problems.append(f"캡션이 너무 짧다({len(cap)}자). 800자 넘게 늘려라")
-    if len(cap.split("\n\n")) < 3:
-        problems.append("캡션에 빈 줄로 나눈 문단이 적다. 문단 사이를 빈 줄로 띄워라")
+    # 캡션은 write_caption() 이 따로 씁니다. 여기서 보면 안 됩니다.
+    # (검사를 안 걷어내서 항상 '0자' 로 걸리고, 대본을 쓸데없이 두 번 더
+    #  부르고 있었습니다. 진짜 지적이 그 잔소리에 묻혔습니다)
     return problems
 
 
