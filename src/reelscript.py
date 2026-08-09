@@ -33,9 +33,23 @@ POINTS = 2
 SYSTEM = """너는 인스타 릴스 대본을 쓰는 작가다.
 책을 소개하는 30~40초 세로 영상의 대본을 쓴다.
 
+★ 무엇보다, 보는 사람이 "이 책이 무슨 책인지" 알게 해라.
+  이게 안 되면 나머지가 다 잘돼도 실패다. 실제로 이런 지적을 받았다.
+  "책의 줄거리나 내용을 보여주지도 않고 재미가 없어. 뭔 말인지 모르겠어."
+- 재료의 '이 책이 무슨 이야기인지' 와 '웹에서 찾은 자료' 에서 내용을 가져와라.
+  거기에 줄거리와 주장이 들어 있다. 카드 문구는 참고만 해라.
+- 구체적인 것을 말해라. 무엇에 대한 책이고, 누가 나오고, 무슨 주장을 하는지.
+  '삶을 돌아보게 한다', '깊은 울림을 준다' 같은 감상만 늘어놓지 마라.
+- 주어진 재료에 없는 사실을 지어내지 마라. 없으면 있는 것만 써라.
+
+★ 자막과 대사는 다른 말이어야 한다.
+- 자막은 화면에 크게 뜨는 간판이고, 대사는 그 아래 흐르는 설명이다.
+  대사의 앞부분을 그대로 자막에 옮기지 마라. 같은 말이 두 번 보인다.
+- 자막은 그것만 읽어도 뜻이 통해야 한다. 말이 도중에 끊긴 구절을 쓰지 마라.
+  나쁜 예: "우리가 살고 있는 모든 것", "이 거짓말이 없었다면", "현재의 허구를"
+  좋은 예: "돈은 원래 없는 것이다", "거짓말이 인류를 키웠다", "지금도 믿고 있다"
+
 지켜야 할 것
-- 주어진 재료(책 정보, 카드 문구)에 없는 사실을 지어내지 마라. 없으면 두루뭉술하게 써라.
-- 자막은 짧게. 한 줄에 들어가야 한다. 문장부호로 끝맺지 않아도 된다.
 - 대사는 말하듯 자연스럽게. 글 읽는 투('~에 대하여', '~라는 점에서')를 쓰지 마라.
 - 과장 광고 표현(인생책, 필독, 충격, 소름)을 쓰지 마라.
 - 마지막은 반드시 할 일을 정확히 말하고 닫아라. 여운으로 흐리지 마라.
@@ -87,13 +101,20 @@ TOOL = {
         "properties": {
             "hook": {
                 **_BEAT,
-                "description": "첫 2초. 여기서 못 잡으면 나머지는 안 본다. 자막 12자, 대사 20자 안팎.",
+                "description": (
+                    "첫 2초. 이 책에서 가장 놀라운 주장이나 사실 하나를 던진다. "
+                    "감상이 아니라 내용이어야 한다. 자막 12자, 대사 24자 안팎."
+                ),
             },
             "points": {
                 "type": "array",
                 "minItems": 2,
                 "maxItems": 2,
-                "description": "이 책이 무엇을 말하는지 둘로 나눈다. 자막 14자, 대사 30자 안팎.",
+                "description": (
+                    "책의 내용 둘. 첫째는 '이 책이 무슨 이야기인가' 를 구체적으로 "
+                    "(무엇을 다루고 무슨 주장을 하는지). 둘째는 그중 가장 인상적인 대목 하나. "
+                    "자막 14자, 대사 30자 안팎."
+                ),
                 "items": _BEAT,
             },
             "closing": {
@@ -169,10 +190,21 @@ def _lint(got: dict) -> list[str]:
     """
     import re
 
-    says = [got["hook"]["say"], *[p["say"] for p in got["points"]], got["closing"]["say"]]
+    # 맺음은 자막 검사에서 뺍니다. '저장해두고 읽기 / 저장해두고 읽어보자' 처럼
+    # 겹치는 게 오히려 자연스럽습니다.
+    beats = [(got["hook"], True), *[(p, True) for p in got["points"]], (got["closing"], False)]
     problems = []
-    for s in says:
-        t = (s or "").strip()
+    for b, check_sub in beats:
+        t = (b.get("say") or "").strip()
+        sub = (b.get("sub") or "").strip()
+
+        if check_sub and sub:
+            # 자막이 대사를 되풀이하면 같은 말이 화면에 두 번 보입니다.
+            if sub in t or (len(sub) >= 6 and t.startswith(sub[:6])):
+                problems.append(f"자막이 대사와 겹침: {sub!r}")
+            # 자막이 조사나 연결어미로 끝나면 말이 도중에 끊긴 것처럼 보입니다.
+            if re.search(r"(은|는|이|가|을|를|의|에|도|만|와|과|면|때|것|들)$", sub):
+                problems.append(f"자막이 말이 끊긴 구절: {sub!r}")
         # 서술어로 끝나는가. 명사로 끝나면 말이 덜 끝난 느낌이 납니다.
         if not re.search(r"(다|까|요|군|네|랴|자)[.!?…]*$", t):
             problems.append(f"서술어로 안 끝남: {t[-18:]!r}")
@@ -190,17 +222,38 @@ def _lint(got: dict) -> list[str]:
 
 
 def _material(post: dict) -> str:
+    """대본을 쓸 재료. 좋은 것부터 순서대로 놓습니다.
+
+    ★ 처음에는 카드 문구만 넣었는데, 카드 문구는 원래 추상적인 '장면' 이라
+      그것만 보고 쓰면 뜬구름 잡는 대본이 나옵니다("뭔 말인지 모르겠다").
+      책이 실제로 무슨 이야기인지는 threads_text 와 웹 자료에 들어 있습니다.
+    """
+    parts = [
+        f"제목: {post.get('title','')}",
+        f"지은이: {post.get('author','')} · 펴낸곳: {post.get('publisher','')}",
+        f"독자 후기 {post.get('review_count',0)}개 · 평점 {post.get('rating_score','?')}",
+    ]
+    if post.get("search_line"):
+        parts.append(f"\n한 줄 소개:\n{post['search_line']}")
+    if post.get("threads_text"):
+        parts.append(
+            "\n■ 이 책이 무슨 이야기인지 (가장 중요한 재료다. 여기서 내용을 가져와라):\n"
+            + post["threads_text"].split("\n\n")[0]
+        )
+    if post.get("research"):
+        parts.append(
+            "\n■ 웹에서 찾은 자료 (줄거리·인물·평가가 들어 있다):\n"
+            + post["research"][:2500]
+        )
     slides = "\n".join(
-        f"  - [{s.get('type','')}] {s.get('headline','')} / {s.get('body','')}"
+        f"  - {s.get('headline','')} / {s.get('body','')}"
         for s in post.get("slides", [])
     )
-    return (
-        f"제목: {post.get('title','')}\n"
-        f"지은이: {post.get('author','')}\n"
-        f"펴낸곳: {post.get('publisher','')}\n"
-        f"독자 후기 {post.get('review_count',0)}개 · 평점 {post.get('rating_score','?')}\n\n"
-        f"이미 만들어둔 카드뉴스 문구(이게 가장 정확한 재료다):\n{slides}\n"
-    )
+    if slides:
+        parts.append(
+            "\n■ 카드뉴스에 쓴 문구 (참고만 해라. 여기 말을 그대로 옮기지 마라):\n" + slides
+        )
+    return "\n".join(parts) + "\n"
 
 
 def write_script(post: dict, config: dict) -> tuple[list[dict], str]:

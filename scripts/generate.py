@@ -288,6 +288,10 @@ def run_tray(tray: dict, seen: dict, config: dict, made: list[str]) -> None:
         post["tray"] = tray["이름"]
         post["research_len"] = len(found["notes"])
         post["research_sources"] = found["sources"]
+        # 웹에서 찾은 자료를 그대로 남깁니다. 지금까지는 길이만 재고 버렸는데,
+        # 나중에 릴스 대본을 쓸 때 이게 가장 좋은 재료입니다. 없으면 카드 문구
+        # 조각만 보고 쓰게 되어 뜬구름 잡는 대본이 나옵니다.
+        post["research"] = found["notes"][:4000]
 
         # 독자들이 넘겨보고 반응을 남깁니다. 발행을 막지는 않습니다.
         post["reviews"] = reviewers.review(book, copy, config)
