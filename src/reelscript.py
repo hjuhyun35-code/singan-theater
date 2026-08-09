@@ -135,22 +135,8 @@ TOOL = {
                     "나쁜 예: '사피엔스', '현재의 허구를 봐야 한다'."
                 ),
             },
-            "caption": {
-                "type": "string",
-                "description": (
-                    "인스타에 붙여넣을 글. 800~1000자. 영상보다 훨씬 길게, "
-                    "그 자체로 읽을거리가 되게 쓴다. 짧게 쓰면 안 된다.\n"
-                    "이 순서로 쓴다:\n"
-                    "1) 첫 줄 — 더보기 전에 보이는 한 줄. 20자 이내로 가장 센 말을 둔다.\n"
-                    "2) 빈 줄을 두고, 짧은 문단 서너 개. 한 문단은 두 문장을 넘기지 않는다. "
-                    "문단 사이마다 빈 줄을 둔다. 영상에서 못 다한 이야기를 여기서 푼다.\n"
-                    "3) '이런 분께 권한다' 로 시작하는 한 줄. 어떤 사람에게 맞는 책인지 적는다.\n"
-                    "4) 마지막 줄 — 저장이나 팔로우를 권한다. 이 줄만 존댓말로 써도 된다.\n"
-                    "해시태그와 책 링크는 넣지 마라. 뒤에 따로 붙는다."
-                ),
-            },
         },
-        "required": ["hook", "points", "closing", "caption"],
+        "required": ["hook", "points", "closing"],
     },
 }
 
@@ -212,6 +198,74 @@ def _paragraphs(caption: str) -> str:
     )
 
 
+CAPTION_TOOL = {
+    "name": "write_caption",
+    "description": "인스타 게시물 본문",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "caption": {"type": "string", "description": "본문 전체"},
+        },
+        "required": ["caption"],
+    },
+}
+
+CAPTION_MIN = 700
+
+
+def write_caption(post: dict, config: dict, scenes: list[dict]) -> str:
+    """캡션만 따로 씁니다.
+
+    ★ 대본과 한 번에 받으면 300자쯤밖에 안 나옵니다. 여러 항목을 한꺼번에
+      채우느라 마지막 항목을 대충 끝내기 때문입니다. max_tokens 도 같이 나눠 씁니다.
+      따로 부르면 같은 모델로도 훨씬 길고 촘촘하게 씁니다.
+    """
+    client = Anthropic(api_key=env("ANTHROPIC_API_KEY", required=True))
+    closing = config.get("영상", {}).get("맺음말", "매일 한 권, 신간극장")
+    said = "\n".join(f"  - {s['headline']}: {s['body']}" for s in scenes)
+
+    prompt = (
+        f"{_material(post)}\n"
+        f"영상에서는 이만큼만 말했다:\n{said}\n\n"
+        f"이제 이 게시물의 본문을 써라. {CAPTION_MIN}자 이상, 1000자 안팎이다.\n"
+        "영상은 30초라 겉만 훑었다. 본문은 책을 제대로 소개하는 자리다.\n"
+        "무엇에 대한 책이고, 어떤 이야기가 들어 있고, 왜 읽을 만한지 풀어 써라.\n\n"
+        "쓰는 방식:\n"
+        "1) 첫 줄 — 더보기 전에 보이는 한 줄. 20자 이내로 가장 센 말.\n"
+        "2) 빈 줄을 두고, 짧은 문단 네다섯 개. 한 문단은 두세 문장.\n"
+        "   문단 사이마다 반드시 빈 줄을 둔다.\n"
+        "3) '이런 분께 권한다' 로 시작하는 한 줄.\n"
+        "4) 마지막 줄 — 저장이나 팔로우를 권한다.\n\n"
+        f"문체는 '~다' 로 통일한다. 마지막 줄만 존댓말로 써도 된다.\n"
+        f"해시태그와 책 링크는 넣지 마라. 뒤에 따로 붙는다.\n"
+        f"'{closing}' 같은 계정 구호도 넣지 마라.\n"
+        "주어진 재료에 없는 사실을 지어내지 마라."
+    )
+
+    warn = ""
+    text = ""
+    for attempt in range(2):
+        msg = client.messages.create(
+            model=config["모델"]["이름"],
+            max_tokens=3000,
+            system="너는 책 소개 SNS 계정의 카피라이터다. 길고 촘촘하게 쓴다.",
+            tools=[CAPTION_TOOL],
+            tool_choice={"type": "tool", "name": "write_caption"},
+            messages=[{"role": "user", "content": prompt + warn}],
+        )
+        got = next((b.input for b in msg.content if b.type == "tool_use"), None)
+        text = (got or {}).get("caption", "").strip()
+        if len(text) >= CAPTION_MIN:
+            break
+        print(f"  캡션이 {len(text)}자라 다시 씁니다")
+        warn = (
+            f"\n\n앞서 쓴 것이 {len(text)}자로 너무 짧았다. "
+            f"{CAPTION_MIN}자를 반드시 넘겨라. 문단을 더 늘리고 내용을 더 풀어 써라."
+        )
+    print(f"  캡션 {len(text)}자")
+    return _paragraphs(text)
+
+
 def _shape(got: dict) -> list[str]:
     """모양부터 봅니다. 이게 깨지면 아래 검사가 통째로 터집니다.
 
@@ -228,8 +282,6 @@ def _shape(got: dict) -> list[str]:
         bad.append("points 가 없다. 반드시 2개를 보내라")
     elif any(not isinstance(p, dict) or not p.get("sub") or not p.get("say") for p in pts):
         bad.append("points 중에 자막이나 대사가 빈 것이 있다")
-    if not (got.get("caption") or "").strip():
-        bad.append("caption 이 비었다")
     return bad
 
 
@@ -361,7 +413,6 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
         if not problems or attempt == 2:
             if problems:
                 print("  ! 아직 어색한 곳이 있습니다:", "; ".join(problems[:3]))
-                got["caption"] = _paragraphs(got.get("caption", ""))
             break
         print("  문체를 고쳐 다시 씁니다:", "; ".join(problems[:3]))
         warn = (
@@ -430,7 +481,7 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
     # 해시태그와 책 링크는 초안이 이미 갖고 있습니다. 모델에게 다시 짓게 하면
     # 없는 링크를 지어내거나 태그가 30개로 불어납니다.
     tags = " ".join(post.get("hashtags", []) or [])
-    caption = "\n\n".join(
-        p for p in [got["caption"].strip(), tags, post.get("link", "")] if p
-    )
+    # 캡션은 따로 부릅니다. 대본과 한 번에 받으면 300자쯤밖에 안 나옵니다.
+    body = write_caption(post, config, scenes)
+    caption = "\n\n".join(p for p in [body, tags, post.get("link", "")] if p)
     return scenes, caption

@@ -274,19 +274,25 @@ def run_tray(tray: dict, seen: dict, config: dict, made: list[str]) -> None:
         out_dir = POSTS / slug
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        # 카드 파일 이름은 반드시 영문. 한글 파일명은 이미지 주소에서 깨집니다.
-        card.CARD_DIR = out_dir
-        paths = card.render_cards(
-            book,
-            copy,
-            config["발행"].get("표지_사용", True),
-            build_credit(book, config),
-            config["발행"].get("색테마", "밤"),
-            config["발행"].get("표지색_강조", True),
-            config["발행"].get("뒷장_표지", "없음"),
-            config["발행"].get("카드_스타일", "기본"),
-            config["발행"].get("낡은_질감", False),
-        )
+        # 카드뉴스를 안 만들 때도 문구와 자료는 그대로 저장합니다.
+        # 릴스 대본이 그걸 재료로 쓰기 때문입니다. 이미지 그리는 시간만 아낍니다.
+        if not config["발행"].get("카드_만들기", True):
+            print("    (카드 이미지는 만들지 않습니다 — 릴스 전용)")
+            paths = []
+        else:
+            # 카드 파일 이름은 반드시 영문. 한글 파일명은 이미지 주소에서 깨집니다.
+            card.CARD_DIR = out_dir
+            paths = card.render_cards(
+                book,
+                copy,
+                config["발행"].get("표지_사용", True),
+                build_credit(book, config),
+                config["발행"].get("색테마", "밤"),
+                config["발행"].get("표지색_강조", True),
+                config["발행"].get("뒷장_표지", "없음"),
+                config["발행"].get("카드_스타일", "기본"),
+                config["발행"].get("낡은_질감", False),
+            )
 
         post = build_post(book, copy, slug, config)
         post["tray"] = tray["이름"]

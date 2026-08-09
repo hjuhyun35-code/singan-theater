@@ -128,10 +128,9 @@ def main() -> int:
                 },
             )
         else:
-            _call(
-                "sendMessage",
-                {"chat_id": chat_id, "text": text, "reply_markup": buttons(slug)},
-            )
+            # 카드가 없으면 인스타에 올릴 것도 없으므로 승인 버튼을 안 붙입니다.
+            # 릴스 전용으로 돌 때가 그렇습니다. 영상은 뒤에서 따로 옵니다.
+            _call("sendMessage", {"chat_id": chat_id, "text": text})
         print(f"보냄: {slug}")
     return 0
 

@@ -33,11 +33,12 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: 한글 폰트 설치
-        # 이게 없으면 카드의 한글이 전부 네모(□)로 나옵니다
+      - name: 한글 폰트와 ffmpeg 설치
+        # 폰트가 없으면 한글이 전부 네모(□)로 나옵니다.
+        # ffmpeg 는 GitHub 서버에 없습니다. 릴스를 만들려면 깔아야 합니다.
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-color-emoji
+          sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-color-emoji ffmpeg
           fc-cache -f
 
       - name: 패키지 설치
@@ -81,13 +82,31 @@ jobs:
           SLUGS: ${{ steps.gen.outputs.slugs }}
         run: python scripts/notify.py
 
-      - name: 카드 미리보기 (Actions 화면에서도 볼 수 있게)
+      - name: 릴스 만들어 보내기
+        # 카드뉴스보다 릴스가 훨씬 많이 퍼져서, 매일 영상까지 만들어 보냅니다.
+        # 초안 하나가 실패해도 나머지는 계속합니다. 영상 하나 없다고 전체를 죽일 이유가 없습니다.
+        if: steps.gen.outputs.count != '0'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLUGS: ${{ steps.gen.outputs.slugs }}
+        run: |
+          for s in $(echo "$SLUGS" | tr ',' ' '); do
+            echo "── 릴스: $s ──"
+            REEL_SLUG="$s" python scripts/make_reel.py || echo "!! 릴스 실패: $s (초안은 정상입니다)"
+          done
+
+      - name: 만든 것 미리보기 (Actions 화면에서도 볼 수 있게)
         if: steps.gen.outputs.count != '0'
         uses: actions/upload-artifact@v4
         with:
           name: cards
-          path: posts/**/card*.jpg
+          path: |
+            posts/**/card*.jpg
+            posts/**/reel.mp4
           retention-days: 14
+          if-no-files-found: ignore
 
       # 2026-08-07 '버튼 기다리기' 단계를 뺐습니다.
       #
