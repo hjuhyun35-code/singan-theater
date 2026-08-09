@@ -138,7 +138,8 @@ TOOL = {
             "caption": {
                 "type": "string",
                 "description": (
-                    "인스타에 붙여넣을 글. 400~600자. 영상보다 길게, 읽을거리가 되게 쓴다.\n"
+                    "인스타에 붙여넣을 글. 800~1000자. 영상보다 훨씬 길게, "
+                    "그 자체로 읽을거리가 되게 쓴다. 짧게 쓰면 안 된다.\n"
                     "이 순서로 쓴다:\n"
                     "1) 첫 줄 — 더보기 전에 보이는 한 줄. 20자 이내로 가장 센 말을 둔다.\n"
                     "2) 빈 줄을 두고, 짧은 문단 서너 개. 한 문단은 두 문장을 넘기지 않는다. "
@@ -211,6 +212,27 @@ def _paragraphs(caption: str) -> str:
     )
 
 
+def _shape(got: dict) -> list[str]:
+    """모양부터 봅니다. 이게 깨지면 아래 검사가 통째로 터집니다.
+
+    실제로 세 번째 시도에서 모델이 points 를 통째로 빼먹고 보냈고,
+    검사기가 KeyError 로 죽어 카드 문구로 물러섰습니다.
+    """
+    bad = []
+    for key in ("hook", "closing"):
+        b = got.get(key)
+        if not isinstance(b, dict) or not b.get("sub") or not b.get("say"):
+            bad.append(f"{key} 가 비었거나 자막/대사가 없다")
+    pts = got.get("points")
+    if not isinstance(pts, list) or not pts:
+        bad.append("points 가 없다. 반드시 2개를 보내라")
+    elif any(not isinstance(p, dict) or not p.get("sub") or not p.get("say") for p in pts):
+        bad.append("points 중에 자막이나 대사가 빈 것이 있다")
+    if not (got.get("caption") or "").strip():
+        bad.append("caption 이 비었다")
+    return bad
+
+
 def _lint(got: dict) -> list[str]:
     """대사가 문체 규칙을 지켰는지 봅니다. 안 지키면 한 번 더 시킵니다.
 
@@ -247,9 +269,11 @@ def _lint(got: dict) -> list[str]:
         problems.append(f"맺음 자막이 할 일이 아니다: {csub!r} (예: 저장해두고 읽기)")
 
     # 캡션이 짧으면 읽을거리가 안 됩니다. 400자를 부탁했는데 150자가 온 적이 있습니다.
+    # 800자를 부탁해도 300자쯤이 옵니다. 그래서 부탁은 크게 하고 기준은
+    # 실제로 받아낼 수 있는 선에 둡니다. 기준을 너무 높이면 매번 실패로 남습니다.
     cap = (got.get("caption") or "").strip()
-    if len(cap) < 320:
-        problems.append(f"캡션이 너무 짧다({len(cap)}자). 400~600자로 늘려라")
+    if len(cap) < 420:
+        problems.append(f"캡션이 너무 짧다({len(cap)}자). 800자 넘게 늘려라")
     if len(cap.split("\n\n")) < 3:
         problems.append("캡션에 빈 줄로 나눈 문단이 적다. 문단 사이를 빈 줄로 띄워라")
     return problems
@@ -319,6 +343,19 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
         got = next((b.input for b in message.content if b.type == "tool_use"), None)
         if not got:
             raise RuntimeError("릴스 대본을 만들지 못했습니다.")
+
+        problems = _shape(got)
+        if problems:
+            # 모양이 깨졌으면 내용 검사는 건너뜁니다. 터집니다.
+            if attempt == 2:
+                raise RuntimeError("대본 모양이 계속 깨집니다: " + "; ".join(problems))
+            print("  모양이 깨져 다시 씁니다:", "; ".join(problems))
+            warn = (
+                "\n\n앞서 보낸 것이 이랬다. 반드시 고쳐라:\n- "
+                + "\n- ".join(problems)
+                + "\nhook, points(2개), closing, caption 을 모두 채워 보내라."
+            )
+            continue
 
         problems = _lint(got)
         if not problems or attempt == 2:
