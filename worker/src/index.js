@@ -23,10 +23,13 @@ const TG = "https://api.telegram.org/bot";
  * is_persistent 를 켜야 한 번 누른 뒤에도 사라지지 않습니다.
  */
 const KEYS = {
-  keyboard: [[{ text: "📄 초안 만들기" }, { text: "🎬 릴스 만들기" }]],
+  keyboard: [
+    [{ text: "📄 초안 만들기" }, { text: "🎬 릴스 만들기" }],
+    [{ text: "📋 했던 것 목록" }],
+  ],
   is_persistent: true,
   resize_keyboard: true,
-  input_field_placeholder: "버튼을 누르거나 직접 쳐도 됩니다",
+  input_field_placeholder: "고쳐: 제목 더 짧게 — 처럼 고칠 곳을 적어도 됩니다",
 };
 
 /** 텔레그램에 짧게 한 마디 합니다. 실패해도 전체를 멈추지 않습니다. */
@@ -143,6 +146,37 @@ export default {
         return new Response("ok");
       }
 
+      // "고쳐: 제목 더 짧게" 처럼 적으면 방금 만든 영상을 그 요청대로 다시 만듭니다.
+      if (/^(고쳐|고쳐줘|다시|수정)/.test(text)) {
+        const note = text.replace(/^(고쳐줘|고쳐|다시|수정)[\s:：,]*/, "").trim();
+        if (!note) {
+          await tell(env, "sendMessage", {
+            chat_id: chatId,
+            text: "무엇을 고칠지 같이 적어주세요.\n예) 고쳐: 제목을 더 짧게, 첫 문장을 더 세게",
+            reply_markup: KEYS,
+          });
+          return new Response("ok");
+        }
+        await tell(env, "sendMessage", {
+          chat_id: chatId,
+          text: `이렇게 고쳐 다시 만들겠습니다.\n"${note}"\n\n3~5분 걸립니다.`,
+          reply_markup: KEYS,
+        });
+        await wake(env, { action: "reel", note, chat_id: chatId });
+        return new Response("ok");
+      }
+
+      // 지금까지 뭘 만들고 올렸는지 보여줍니다.
+      if (text.includes("목록") || text.includes("기록") || text.includes("했던")) {
+        await tell(env, "sendMessage", {
+          chat_id: chatId,
+          text: "지금까지 만든 것을 정리해 보내드리겠습니다. 30초쯤 걸립니다.",
+          reply_markup: KEYS,
+        });
+        await wake(env, { action: "list", chat_id: chatId });
+        return new Response("ok");
+      }
+
       if (text.includes("초안")) {
         await tell(env, "sendMessage", {
           chat_id: chatId,
@@ -160,11 +194,14 @@ export default {
         chat_id: chatId,
         text:
           "아래 버튼을 누르시면 됩니다.\n\n" +
-          "📄 초안 만들기 — 새 책을 골라 카드 5장 (10~20분)\n" +
-          "🎬 릴스 만들기 — 후기 많은 초안으로 세로 영상 (3~5분)\n\n" +
-          "카드가 오면 그 아래 [승인하고 올리기] 를 누르세요. 1분 안에 인스타에 올라갑니다.\n" +
-          "릴스는 음악이 없습니다. 받으신 뒤 앱에서 음악을 붙여 올려주세요.\n\n" +
-          "특정 초안으로 영상을 만들려면 '릴스 20260806-1' 처럼 번호를 붙이세요.",
+          "📄 초안 만들기 — 새 책을 골라 문구와 자료를 만듭니다 (10~20분)\n" +
+          "🎬 릴스 만들기 — 아직 안 쓴 책으로 세로 영상 + 캡션 (3~5분)\n" +
+          "📋 했던 것 목록 — 지금까지 만들고 올린 책\n\n" +
+          "고칠 곳이 있으면 이렇게 적어주세요.\n" +
+          "  고쳐: 제목을 더 짧게\n" +
+          "그러면 방금 만든 영상을 그 요청대로 다시 만듭니다.\n\n" +
+          "릴스는 음악이 없습니다. 받으신 뒤 앱에서 음악을 붙여 올려주세요.\n" +
+          "특정 초안으로 만들려면 '릴스 20260806-1' 처럼 번호를 붙이세요.",
         reply_markup: KEYS,
       });
     }

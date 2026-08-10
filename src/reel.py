@@ -56,7 +56,7 @@ def _first_sentences(text: str, n: int) -> str:
     return " ".join(p for p in parts[:n] if p).strip()
 
 
-def build_script(post: dict, config: dict) -> list[dict]:
+def build_script(post: dict, config: dict, note: str = "") -> list[dict]:
     """장면 목록을 만듭니다.
 
     기본은 릴스 전용 대본입니다. 카드 문구를 그대로 읽으면 '여운' 으로 끝나
@@ -70,7 +70,7 @@ def build_script(post: dict, config: dict) -> list[dict]:
         try:
             from . import reelscript
 
-            scenes, caption = reelscript.write_script(post, config)
+            scenes, caption = reelscript.write_script(post, config, note)
             return scenes, caption
         except Exception as exc:
             print(f"  ! 릴스 대본 실패, 카드 문구로 만듭니다: {exc}")
@@ -248,6 +248,15 @@ def render_frames(
         t += item["dur"]
     total = t
 
+    # 강조가 실제로 칠해졌는지 눈으로 확인할 수 있게 찍어둡니다.
+    # 안 칠해지는 걸 두 번이나 못 알아채서 넣었습니다.
+    for sc in scenes:
+        marked = [w["text"] for w in _words(sc["headline"], sc.get("emphasis", "")) if w["hot"]]
+        print(
+            f"    제목 강조: {sc.get('emphasis','') or '(지정 없음)'} "
+            f"→ {marked or '칠해진 낱말 없음 ⚠'}  [{sc['headline']}]"
+        )
+
     html = _env.get_template("reel.html").render(
         scenes=[
             {**sc, "words": _words(sc["headline"], sc["emphasis"]),
@@ -361,7 +370,7 @@ def mux(frames_dir: Path, audio: Path, out: Path) -> Path:
     return out
 
 
-def make_reel(post: dict, config: dict, out_path: Path) -> dict:
+def make_reel(post: dict, config: dict, out_path: Path, note: str = "") -> dict:
     """초안 하나로 릴스 영상 한 편을 만듭니다.
 
     돌려주는 것: {"path": 영상 파일, "caption": 인스타에 붙여넣을 글}
@@ -377,7 +386,7 @@ def make_reel(post: dict, config: dict, out_path: Path) -> dict:
         "표지": float(설정.get("끝여운", 2.4)),
     }
 
-    scenes, caption = build_script(post, config)
+    scenes, caption = build_script(post, config, note)
     work = Path(tempfile.mkdtemp(prefix="reel-"))
     try:
         print(f"  목소리 {voice} · 속도 {rate} · 쉼 {gap}초 · 끝여운 {tails['여운']}초")

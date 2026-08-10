@@ -23,6 +23,19 @@ from src import reel  # noqa: E402
 POSTS = ROOT / "posts"
 API = "https://api.telegram.org/bot{token}/{method}"
 
+# 입력창 아래에 늘 떠 있는 버튼. Worker 가 답할 때만 붙이고 있어서,
+# 봇에게 글자를 안 치면 버튼이 안 생겼습니다. 매일 오는 이 메시지에도 붙입니다.
+# (worker/src/index.js 의 KEYS 와 같은 내용이어야 합니다)
+KEYS = json.dumps(
+    {
+        "keyboard": [[{"text": "📄 초안 만들기"}, {"text": "🎬 릴스 만들기"}]],
+        "is_persistent": True,
+        "resize_keyboard": True,
+        "input_field_placeholder": "고쳐: 제목 더 짧게  — 처럼 고칠 곳을 적어도 됩니다",
+    },
+    ensure_ascii=False,
+)
+
 
 def pick_slug() -> str:
     """번호를 안 주면 '후기가 가장 많은, 아직 영상 안 만든 초안' 을 고릅니다.
@@ -43,17 +56,50 @@ def pick_slug() -> str:
             p = json.loads(f.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             continue
-        rows.append((d.name, int(p.get("review_count") or 0), bool(p.get("reel_at"))))
+        rows.append(
+            {
+                "slug": d.name,
+                "reviews": int(p.get("review_count") or 0),
+                "reeled": bool(p.get("reel_at")),
+                # 카드뉴스로 이미 올린 책도 재탕입니다. 형식만 다를 뿐 같은 책입니다.
+                "posted": bool(p.get("published")),
+                "skipped": bool(p.get("skipped")),
+            }
+        )
     if not rows:
         return ""
 
-    fresh = [r for r in rows if not r[2]]
-    pool = fresh or rows
-    if not fresh:
-        print("영상 안 만든 초안이 없습니다. 후기 많은 순으로 다시 고릅니다.")
-    pool.sort(key=lambda r: (r[1], r[0]), reverse=True)
-    print(f"고른 초안: {pool[0][0]} (후기 {pool[0][1]}개)")
-    return pool[0][0]
+    # 아직 아무 데도 안 쓴 책 → 릴스만 안 쓴 책 → 그래도 없으면 전부
+    layers = [
+        ("아직 안 쓴 책", [r for r in rows if not r["reeled"] and not r["posted"] and not r["skipped"]]),
+        ("릴스만 안 만든 책", [r for r in rows if not r["reeled"]]),
+        ("전부", rows),
+    ]
+    for label, pool in layers:
+        if pool:
+            pool.sort(key=lambda r: (r["reviews"], r["slug"]), reverse=True)
+            pick = pool[0]
+            print(f"고른 초안: {pick['slug']} (후기 {pick['reviews']}개, {label})")
+            if label != "아직 안 쓴 책":
+                print("  ! 새 책이 없어 이미 쓴 책에서 골랐습니다. 초안을 더 만드세요.")
+            return pick["slug"]
+    return ""
+
+
+def last_reeled() -> str:
+    """가장 최근에 영상을 만든 초안. '고쳐 주세요' 요청은 이걸 다시 만듭니다."""
+    best, when = "", ""
+    for d in POSTS.iterdir():
+        f = d / "post.json"
+        if not d.is_dir() or not f.exists():
+            continue
+        try:
+            p = json.loads(f.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        if p.get("reel_at") and p["reel_at"] > when:
+            best, when = d.name, p["reel_at"]
+    return best
 
 
 def mark_done(slug: str) -> None:
@@ -95,15 +141,27 @@ def send(video: Path, post: dict, caption: str) -> None:
     if caption:
         requests.post(
             API.format(token=token, method="sendMessage"),
-            data={"chat_id": chat, "text": caption, "disable_web_page_preview": True},
+            data={
+                "chat_id": chat,
+                "text": caption,
+                "disable_web_page_preview": True,
+                "reply_markup": KEYS,
+            },
             timeout=60,
         )
         print("캡션도 보냈습니다.")
 
 
 def main() -> int:
+    note = (os.environ.get("REEL_NOTE") or "").strip()
     slug = (sys.argv[1] if len(sys.argv) > 1 else "") or os.environ.get("REEL_SLUG", "")
-    slug = slug.strip() or pick_slug()
+    slug = slug.strip()
+    if not slug:
+        # 고칠 곳을 적어 보내신 경우엔 새 책을 고르는 게 아니라
+        # 방금 만든 그 영상을 다시 만드는 것이 맞습니다.
+        slug = (last_reeled() if note else "") or pick_slug()
+    if note:
+        print(f"고쳐 달라는 요청: {note}")
     path = POSTS / slug / "post.json"
     if not path.exists():
         print(f"초안을 찾을 수 없습니다: {slug}")
@@ -114,7 +172,7 @@ def main() -> int:
     print(f"릴스를 만듭니다: {slug} — {post.get('short_title') or post.get('title','')}")
 
     out = POSTS / slug / "reel.mp4"
-    made = reel.make_reel(post, config, out)
+    made = reel.make_reel(post, config, out, note)
     send(out, post, made.get("caption", ""))
     mark_done(slug)
 

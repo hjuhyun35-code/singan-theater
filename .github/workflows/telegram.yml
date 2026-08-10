@@ -89,6 +89,8 @@ jobs:
           # 릴스 대본과 캡션을 쓰는 데 필요합니다. 없으면 카드 문구로 물러섭니다.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           REEL_SLUG: ${{ github.event.client_payload.slug }}
+          # 텔레그램에서 '고쳐: ~' 라고 적어 보낸 내용. 대본을 쓸 때 최우선으로 반영합니다.
+          REEL_NOTE: ${{ github.event.client_payload.note }}
         run: python scripts/make_reel.py
 
       - name: 만든 기록 남기기
@@ -121,6 +123,23 @@ jobs:
           path: posts/**/reel.mp4
           retention-days: 7
           if-no-files-found: ignore
+
+  # ── "목록" 이라고 보낸 경우: 지금까지 뭘 만들고 올렸는지 보여줍니다. ──
+  list:
+    if: github.event.client_payload.action == 'list'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: 기록 보내기
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/history.py
 
   # ── "초안" 이라고 보낸 경우: 새로 만들어 텔레그램으로 보냅니다. 10~20분. ──
   draft:

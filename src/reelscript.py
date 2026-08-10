@@ -361,7 +361,7 @@ def _material(post: dict) -> str:
     return "\n".join(parts) + "\n"
 
 
-def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
+def write_script(post: dict, config: dict, note: str = "") -> tuple[list[dict], str]:
     """장면 목록과 인스타에 붙여넣을 캡션을 돌려줍니다."""
     client = Anthropic(api_key=env("ANTHROPIC_API_KEY", required=True))
     tone = config.get("글투", {}).get("지침", "")
@@ -375,6 +375,12 @@ def write_script(post: dict, config: dict) -> tuple[list[dict], str]:
         f"맺음 대사 끝에는 '{closing}' 이 자연스럽게 이어지도록 써라. "
         "그 문구 자체를 대사에 넣지는 마라. 뒤에 따로 붙는다."
     )
+    if note:
+        # 사람이 텔레그램으로 적어 보낸 고칠 곳. 다른 지침보다 우선합니다.
+        prompt += (
+            "\n\n★ 사람이 이렇게 고쳐 달라고 했다. 다른 지침보다 이것을 먼저 지켜라:\n"
+            f"   {note}"
+        )
 
     # 두 번으로는 모자랐습니다. 한 번 고쳐 써도 다른 데가 어긋나 그대로 통과했습니다.
     got, warn = None, ""
