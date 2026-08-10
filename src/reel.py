@@ -201,10 +201,31 @@ def _body_parts(body: str, hot: str) -> list[dict]:
 
 
 def _words(headline: str, emphasis: str) -> list[dict]:
-    """제목을 낱말로 쪼갭니다. 한 낱말씩 튀어나오게 하려는 것입니다."""
-    out = []
-    for w in headline.split():
-        out.append({"text": w, "hot": bool(emphasis) and w in emphasis})
+    """제목을 낱말로 쪼갭니다. 한 낱말씩 튀어나오게 하려는 것입니다.
+
+    강조는 '겹치면 칠한다' 로 봅니다. 낱말이 강조 문구와 글자까지 똑같아야
+    칠하게 했더니 거의 안 칠해졌습니다. 한국어는 조사가 붙어서
+    모델이 '허구' 라고 지정해도 화면의 낱말은 '허구다' 입니다.
+    (2026-08-10 실측: 다섯 경우 중 하나만 칠해졌습니다)
+    """
+    words = headline.split()
+    lo = headline.find(emphasis) if emphasis else -1
+    if lo < 0 and emphasis:
+        # 강조 문구가 통째로는 없을 때. 낱말 하나라도 서로를 품고 있으면 그걸 씁니다.
+        for w in words:
+            # 한 글자짜리는 아무 데나 걸립니다('말' 이 '전혀다른말' 안에 들어 있듯이).
+            if len(w) >= 2 and (w in emphasis or emphasis in w):
+                lo = headline.find(w)
+                emphasis = w
+                break
+    hi = lo + len(emphasis) if lo >= 0 else -1
+
+    out, pos = [], 0
+    for w in words:
+        i = headline.index(w, pos)
+        pos = i + len(w)
+        # 낱말이 강조 구간과 조금이라도 겹치면 칠합니다.
+        out.append({"text": w, "hot": lo >= 0 and i < hi and pos > lo})
     return out
 
 
