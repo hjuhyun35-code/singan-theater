@@ -152,34 +152,51 @@ def send(video: Path, post: dict, caption: str) -> None:
         print("캡션도 보냈습니다.")
 
 
+def make_one(slug: str, note: str, config: dict) -> bool:
+    path = POSTS / slug / "post.json"
+    if not path.exists():
+        print(f"초안을 찾을 수 없습니다: {slug}")
+        return False
+
+    post = json.loads(path.read_text(encoding="utf-8"))
+    print(f"릴스를 만듭니다: {slug} — {post.get('short_title') or post.get('title','')}")
+    out = POSTS / slug / "reel.mp4"
+    made = reel.make_reel(post, config, out, note)
+    send(out, post, made.get("caption", ""))
+    # 표시를 남겨야 다음에 같은 책이 또 걸리지 않습니다.
+    # 한 번에 여러 개 만들 때 특히 중요합니다.
+    mark_done(slug)
+    # 영상 파일은 저장소에 넣지 않습니다(.gitignore). 텔레그램에 보낸 것으로 충분합니다.
+    print(f"파일: {out}")
+    return True
+
+
 def main() -> int:
     note = (os.environ.get("REEL_NOTE") or "").strip()
     slug = (sys.argv[1] if len(sys.argv) > 1 else "") or os.environ.get("REEL_SLUG", "")
     slug = slug.strip()
-    if not slug:
-        # 고칠 곳을 적어 보내신 경우엔 새 책을 고르는 게 아니라
-        # 방금 만든 그 영상을 다시 만드는 것이 맞습니다.
-        slug = (last_reeled() if note else "") or pick_slug()
+    count = max(1, int(os.environ.get("REEL_COUNT") or 1))
+    config = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+
     if note:
         print(f"고쳐 달라는 요청: {note}")
-    path = POSTS / slug / "post.json"
-    if not path.exists():
-        print(f"초안을 찾을 수 없습니다: {slug}")
-        return 1
+    if slug:
+        # 번호를 콕 집어 주셨으면 그 하나만 만듭니다.
+        return 0 if make_one(slug, note, config) else 1
 
-    post = json.loads(path.read_text(encoding="utf-8"))
-    config = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
-    print(f"릴스를 만듭니다: {slug} — {post.get('short_title') or post.get('title','')}")
-
-    out = POSTS / slug / "reel.mp4"
-    made = reel.make_reel(post, config, out, note)
-    send(out, post, made.get("caption", ""))
-    mark_done(slug)
-
-    # 영상은 저장소에 넣지 않습니다. 매일 쌓이면 저장소가 금방 무거워집니다.
-    # 텔레그램에 보낸 것으로 충분하고, 필요하면 다시 만들면 됩니다.
-    print(f"파일: {out}")
-    return 0
+    # 여러 개를 한 작업 안에서 만듭니다. 요청을 여러 번 보내면 GitHub 가
+    # 줄 세우면서 앞의 것을 취소해 버려 몇 개만 남습니다.
+    made = 0
+    for n in range(count):
+        pick = (last_reeled() if note and n == 0 else "") or pick_slug()
+        if not pick:
+            print("더 만들 초안이 없습니다.")
+            break
+        print(f"=== {n+1}/{count} ===")
+        if make_one(pick, note, config):
+            made += 1
+    print(f"모두 {made}개 만들었습니다.")
+    return 0 if made else 1
 
 
 if __name__ == "__main__":

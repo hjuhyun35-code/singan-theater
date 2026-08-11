@@ -51,7 +51,7 @@ jobs:
   reel:
     if: github.event.client_payload.action == 'reel'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 90
     # 두 건이 동시에 돌면 같은 post.json 을 고치다 rebase 가 충돌하고,
     # 저장소가 detached HEAD 로 빠져 push 가 죽습니다 (2026-08-07 실제로 겪음).
     # 취소하지 않고 줄 세웁니다. 영상은 둘 다 나와야 합니다.
@@ -91,6 +91,9 @@ jobs:
           REEL_SLUG: ${{ github.event.client_payload.slug }}
           # 텔레그램에서 '고쳐: ~' 라고 적어 보낸 내용. 대본을 쓸 때 최우선으로 반영합니다.
           REEL_NOTE: ${{ github.event.client_payload.note }}
+          # 한 작업 안에서 몇 개를 만들지. 요청을 여러 번 보내면 GitHub 가 줄 세우다
+          # 앞의 것을 취소해 몇 개만 남습니다. 그래서 한 번에 만듭니다.
+          REEL_COUNT: ${{ github.event.client_payload.count }}
         run: python scripts/make_reel.py
 
       - name: 만든 기록 남기기
@@ -145,7 +148,7 @@ jobs:
   draft:
     if: github.event.client_payload.action == 'draft'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -154,11 +157,10 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: 한글 폰트 설치
-        # 이게 없으면 카드의 한글이 전부 네모(□)로 나옵니다
+      - name: 한글 폰트와 ffmpeg 설치
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-color-emoji
+          sudo apt-get install -y -qq fonts-noto-cjk fonts-noto-color-emoji ffmpeg
           fc-cache -f
 
       - name: 패키지 설치
@@ -198,10 +200,28 @@ jobs:
           SLUGS: ${{ steps.gen.outputs.slugs }}
         run: python scripts/notify.py
 
-      - name: 카드 미리보기
+      - name: 릴스 만들어 보내기
+        # 카드뉴스를 끈 뒤로는 이게 있어야 실제로 쓸 것이 나옵니다.
+        # 하나 실패해도 나머지는 계속합니다.
+        if: steps.gen.outputs.count != '0'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLUGS: ${{ steps.gen.outputs.slugs }}
+        run: |
+          for s in $(echo "$SLUGS" | tr ',' ' '); do
+            echo "── 릴스: $s ──"
+            REEL_SLUG="$s" python scripts/make_reel.py || echo "!! 릴스 실패: $s (초안은 정상입니다)"
+          done
+
+      - name: 만든 것 미리보기
         if: steps.gen.outputs.count != '0'
         uses: actions/upload-artifact@v4
         with:
           name: cards
-          path: posts/**/card*.jpg
+          path: |
+            posts/**/card*.jpg
+            posts/**/reel.mp4
           retention-days: 14
+          if-no-files-found: ignore

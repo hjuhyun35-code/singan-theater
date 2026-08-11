@@ -141,6 +141,16 @@ TOOL = {
 }
 
 
+def _model(config: dict) -> str:
+    """대본과 캡션을 쓸 모델.
+
+    규칙이 많아 하이쿠가 항목을 빼먹습니다(2026-08-11 확인). 그래서 따로 둡니다.
+    '모델.대본' 이 없으면 예전처럼 '모델.이름' 을 씁니다.
+    """
+    m = config.get("모델", {})
+    return m.get("대본") or m["이름"]
+
+
 def _cap(text: str, limit: int) -> str:
     """길면 잘라냅니다. 말 도중에 끊기면 듣기 흉하므로 문장 → 쉼표 → 낱말 순으로 끊습니다.
 
@@ -246,7 +256,7 @@ def write_caption(post: dict, config: dict, scenes: list[dict]) -> str:
     text = ""
     for attempt in range(2):
         msg = client.messages.create(
-            model=config["모델"]["이름"],
+            model=_model(config),
             max_tokens=3000,
             system="너는 책 소개 SNS 계정의 카피라이터다. 길고 촘촘하게 쓴다.",
             tools=[CAPTION_TOOL],
@@ -386,7 +396,7 @@ def write_script(post: dict, config: dict, note: str = "") -> tuple[list[dict], 
     got, warn = None, ""
     for attempt in range(3):
         message = client.messages.create(
-            model=config["모델"]["이름"],
+            model=_model(config),
             max_tokens=1500,
             system=SYSTEM,
             tools=[TOOL],
