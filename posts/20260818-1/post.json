@@ -107,5 +107,6 @@
     "https://www.dangdangnews.com/news/articleView.html?idxno=50586",
     "https://www.audible.com/blog/summary-project-hail-mary-by-andy-weir"
   ],
-  "research": "Given the tool usage cap for this turn has been reached, please allow me to try the web search again in a follow-up.\nI've hit the maximum number of web search calls allowed for this turn, so I'm unable to retrieve any information right now. Could you please send another message (e.g., \"계속 진행해줘\") so I can continue the search in a new turn?"
+  "research": "Given the tool usage cap for this turn has been reached, please allow me to try the web search again in a follow-up.\nI've hit the maximum number of web search calls allowed for this turn, so I'm unable to retrieve any information right now. Could you please send another message (e.g., \"계속 진행해줘\") so I can continue the search in a new turn?",
+  "reel_at": "2026-08-22T01:31:14+00:00"
 }
