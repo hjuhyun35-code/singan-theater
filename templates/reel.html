@@ -70,18 +70,37 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  /* 마지막 표지 장면 */
-  .cover-scene { align-items: center; text-align: center; }
-  .cover-scene .shot {
-    width: 620px; height: 880px; object-fit: cover;
-    box-shadow: 0 40px 90px rgba(0,0,0,0.24);
-    margin-bottom: 64px;
+  /* 마지막 표지 장면 = 썸네일.
+     릴스 목록에서는 아주 작게 보입니다. 그 크기에서 읽히려면 글씨가 커야 합니다.
+     2026-08-22 이전에는 표지가 화면을 다 차지하고 제목이 92px 이라 안 읽혔습니다.
+     지금은 표지를 위쪽에 두고 글씨가 아래 절반 이상을 차지합니다.
+     글씨 크기는 문장 길이에 따라 reel.py 가 정해 넘겨줍니다. */
+  .cover-scene {
+    align-items: center; text-align: center;
+    justify-content: flex-start; padding: 92px 70px 0;
   }
-  .cover-scene .head { font-size: 92px; }
-  .cover-scene .body { margin-top: 26px; font-size: 44px; }
+  .cover-scene .shot {
+    width: 470px; height: 664px; object-fit: contain;
+    filter: drop-shadow(0 26px 44px rgba(0,0,0,0.22));
+    margin-bottom: 54px;
+  }
+  .cover-scene .head {
+    /* ★ width 를 안 잡으면 줄바꿈이 안 됩니다.
+       cover-scene 은 align-items:center 라 글자 상자가 '한 줄 길이' 로 늘어나
+       화면 밖으로 흘러나갑니다. 다른 장면은 stretch 라 저절로 접혔습니다. */
+    width: 100%;
+    line-height: 1.02; letter-spacing: -0.045em;
+    /* 아주 옅은 그림자. 밝은 배경에서 글자 가장자리를 또렷하게 합니다. */
+    text-shadow: 0 6px 14px rgba(0,0,0,0.14);
+  }
+  /* 책 제목과 지은이는 작게. 주인공은 위의 큰 글씨입니다. */
+  .cover-scene .body {
+    position: absolute; left: 0; right: 0; bottom: 178px;
+    margin-top: 0; font-size: 42px; color: #5A5A5A; max-width: none;
+  }
   .brand {
-    position: absolute; bottom: 96px; left: 0; right: 0; text-align: center;
-    font-size: 38px; letter-spacing: 0.3em; color: var(--accent);
+    position: absolute; bottom: 92px; left: 0; right: 0; text-align: center;
+    font-size: 36px; letter-spacing: 0.34em; color: var(--accent);
   }
 
   {% for s in scenes %}
@@ -117,7 +136,7 @@
            style="animation: softin 0.5s ease-out {{ '%.3f'|format(s.start + 0.08) }}s both">{{ s.kicker }}</div>
     {% endif %}
 
-    <div class="head">
+    <div class="head"{% if s.head_size %} style="font-size: {{ s.head_size }}px"{% endif %}>
       {%- for w in s.words -%}
       <span class="w {% if w.hot %}hot{% endif %}"
             style="animation: wordin 0.52s cubic-bezier(.2,.8,.25,1) {{ '%.3f'|format(s.start + 0.18 + loop.index0 * 0.075) }}s both">{{ w.text }}</span>

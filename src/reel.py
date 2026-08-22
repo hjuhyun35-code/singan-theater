@@ -182,6 +182,53 @@ def narrate(
     return plan
 
 
+# 썸네일 글자 자리 (1080x1920 기준). 실측으로 잡은 값입니다.
+_TW = 940.0    # 글자가 들어갈 가로 (1080 - 양옆 여백 70)
+_TH = 790.0    # 표지 아래부터 책 제목 위까지 쓸 세로. 실제 자리는 876 이지만 여유를 둡니다.
+_EM = 0.79     # 검은고딕 글자 하나가 차지하는 폭 (2026-08-22 크롬에서 실측)
+_GAP = 0.22    # 낱말 사이 여백
+
+
+def _line_count(words: list[str], size: int) -> int:
+    """그 크기로 쓰면 몇 줄이 되는지 실제로 채워봅니다.
+
+    '전체 글자 수 나누기 한 줄 글자 수' 로 어림했다가 크게 틀렸습니다.
+    낱말은 중간에서 안 잘리므로 줄 끝에 자리가 모자라면 통째로 다음 줄로 넘어갑니다.
+    그래서 어림값보다 줄이 훨씬 많이 나옵니다(3줄로 봤는데 실제 5줄).
+    """
+    lines, cur = 1, 0.0
+    for w in words:
+        # ★ 낱말 뒤 여백은 줄 끝에서도 자리를 차지합니다. 낱말 '사이' 로만 세면
+        #   실제보다 줄을 적게 잡습니다(3줄로 봤는데 브라우저는 5줄).
+        box = len(w) * _EM * size + _GAP * size
+        if cur > 0 and cur + box > _TW:
+            lines += 1
+            cur = box
+        else:
+            cur += box
+    return lines
+
+
+def _head_size(headline: str) -> int:
+    """썸네일 큰 글씨 크기를 문장에 맞춰 정합니다.
+
+    가로(가장 긴 낱말이 한 줄에 들어갈 것)와 세로(책 제목과 안 겹칠 것)를
+    둘 다 만족하는 가장 큰 크기를 고릅니다.
+    """
+    words = (headline or "").split()
+    if not words:
+        return 160
+    longest = max(len(w) for w in words)
+    for size in range(240, 96, -4):
+        # 가장 긴 낱말 하나가 줄을 넘으면 한글은 글자 사이에서 잘립니다.
+        # ('드라큘라가' 가 '드라큘라 / 가' 로 쪼개짐) 뒤 여백까지 넣어 막습니다.
+        if longest * _EM * size + _GAP * size > _TW:
+            continue
+        if _line_count(words, size) * size * 1.02 <= _TH:
+            return size
+    return 100
+
+
 def _body_parts(body: str, hot: str) -> list[dict]:
     """설명글을 '보통 / 강조 / 보통' 으로 쪼갭니다.
 
@@ -261,6 +308,8 @@ def render_frames(
         scenes=[
             {**sc, "words": _words(sc["headline"], sc["emphasis"]),
              "body_parts": _body_parts(sc.get("body", ""), sc.get("body_hot", "")),
+             # 썸네일 장면만 글씨 크기를 따로 정합니다. 나머지는 서식의 기본값을 씁니다.
+             "head_size": _head_size(sc["headline"]) if sc.get("kind") == "표지" else 0,
              "start": starts[i], "dur": plan[i]["dur"],
              # 본문 글은 본문을 읽기 시작할 때 맞춰 뜹니다. 낱말 수로 어림잡던 것보다 정확합니다.
              "body_at": plan[i]["body_start"], "index": i}
