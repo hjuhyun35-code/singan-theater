@@ -46,6 +46,7 @@ def rows() -> list[dict]:
                 "author": p.get("author", ""),
                 "reviews": int(p.get("review_count") or 0),
                 "posted": when(p.get("published_at", "")),
+                "hand": bool(p.get("hand_posted")),
                 "reeled": when(p.get("reel_at", "")),
                 "skipped": bool(p.get("skipped")),
             }
@@ -54,8 +55,9 @@ def rows() -> list[dict]:
 
 
 def report(items: list[dict]) -> str:
-    done = [r for r in items if r["posted"] or r["reeled"]]
-    todo = [r for r in items if not r["posted"] and not r["reeled"] and not r["skipped"]]
+    done = [r for r in items if r["posted"] or r["reeled"] or r["hand"]]
+    todo = [r for r in items
+            if not r["posted"] and not r["reeled"] and not r["hand"] and not r["skipped"]]
 
     lines = [f"📚 지금까지 만든 것 {len(items)}권\n"]
 
@@ -67,6 +69,8 @@ def report(items: list[dict]) -> str:
                 marks.append(f"카드 {r['posted']}")
             if r["reeled"]:
                 marks.append(f"릴스 {r['reeled']}")
+            if r["hand"] and not r["reeled"]:
+                marks.append("직접 올림")
             lines.append(f"  · {r['title']} — {' / '.join(marks)}")
         lines.append("")
 

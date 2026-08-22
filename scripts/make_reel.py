@@ -62,7 +62,9 @@ def pick_slug() -> str:
                 "reviews": int(p.get("review_count") or 0),
                 "reeled": bool(p.get("reel_at")),
                 # 카드뉴스로 이미 올린 책도 재탕입니다. 형식만 다를 뿐 같은 책입니다.
-                "posted": bool(p.get("published")),
+                # hand_posted 는 릴스를 손으로 인스타에 올리신 것. 봇은 그걸 알 수
+                # 없어서 텔레그램에서 '올렸어' 라고 알려주시면 여기 표시됩니다.
+                "posted": bool(p.get("published") or p.get("hand_posted")),
                 "skipped": bool(p.get("skipped")),
             }
         )

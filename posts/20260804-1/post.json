@@ -132,5 +132,6 @@
     }
   ],
   "created_at": "2026-08-04T02:42:56+00:00",
-  "published": false
+  "published": false,
+  "hand_posted": true
 }
