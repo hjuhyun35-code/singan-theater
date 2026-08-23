@@ -14,6 +14,7 @@ watch_buttons.py 의 것을 그대로 씁니다. 두 벌로 나뉘면 한쪽만 
   TG_MESSAGE_ID  바꿔줄 메시지 번호
 """
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -32,6 +33,29 @@ def main() -> int:
 
     action = os.environ.get("TG_ACTION", "")
     slug = os.environ.get("TG_SLUG", "")
+
+    # 카드뉴스를 끈 뒤로는 인스타에 올리지 않습니다.
+    # 예전 텔레그램 메시지에 남아 있는 '승인하고 올리기' 버튼은 아직 살아 있어서,
+    # 실수로 누르면 옛 카드가 올라갑니다. 여기서 막습니다.
+    config = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+    if action == "publish" and not config.get("발행", {}).get("카드_만들기", True):
+        print("카드뉴스 발행은 꺼져 있습니다. 올리지 않습니다.")
+        chat = os.environ.get("TG_CHAT_ID", "")
+        if token and chat:
+            import requests
+
+            requests.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                data={
+                    "chat_id": chat,
+                    "text": (
+                        "카드뉴스 발행은 꺼져 있습니다. 지금은 릴스만 만듭니다. "
+                        "다시 켜려면 config.json 의 발행.카드_만들기 를 true 로 바꾸세요."
+                    ),
+                },
+                timeout=30,
+            )
+        return 0
     if action not in ("publish", "skip") or not slug:
         print(f"무엇을 할지 알 수 없습니다: action={action!r} slug={slug!r}")
         return 1
